@@ -8,12 +8,12 @@
 - **Services** validate tokens with:
   - `AUTH_ENABLED=true`
   - `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWKS_URL`
-- **Service keys**: Media API requires `X-Media-Service-Key`; keep it secret and rotate regularly.
+- **Service auth**: Media API, Response API, and MCP Tools enforce Keycloak-issued JWTs via `AUTH_*` settings.
 - **Kong plugins**: apply rate limiting, request size limits, and header sanitization at the edge.
 
 ## Network Boundaries
 - **Public**: Kong (8000) and, optionally, Keycloak admin (8085) when protected.
-- **Private**: LLM API (8080), Response API (8082), Media API (8285), MCP Tools (8091), vLLM (8001).
+- **Private**: LLM API (8080), Response API (8082), Media API (8285), MCP Tools (8091), vLLM (8101).
 - **MCP network**: SearXNG, Redis, Vector Store, SandboxFusion run on `jan-server_mcp-network` and are not exposed externally.
 - **Kubernetes**: use NetworkPolicies to isolate namespaces or rely on service mesh if available.
 
@@ -33,7 +33,7 @@
 - **JWT validation**: services reject expired or mismatched tokens and refresh their JWKS cache periodically.
 - **Tool execution**: SandboxFusion isolates python code; `SANDBOX_FUSION_REQUIRE_APPROVAL` can force manual approval.
 - **Web fetches**: SearXNG provides result filtering; Response API enforces depth/time budgets.
-- **Media uploads**: requests require `X-Media-Service-Key` and enforce `MEDIA_MAX_BYTES`.
+- **Media uploads**: requests require a Bearer token plus `MEDIA_MAX_BYTES`/content-type validation before accepting bytes.
 - **Rate limits**: configure Kong plugins per route; Response API also throttles multi-step workflows internally.
 
 ## Incident Response
