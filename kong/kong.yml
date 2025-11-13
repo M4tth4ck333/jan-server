@@ -150,6 +150,22 @@ services:
               exposed_headers: ["X-Request-Id"]
               credentials: false
               max_age: 3600
+      - name: llm-api-swagger
+        paths:
+          - ~/api/swagger.*
+        strip_path: false
+        path_handling: v0
+        tags: [llm, swagger, public]
+        plugins:
+          - name: cors
+            tags: [llm, swagger, cors]
+            config:
+              origins: ["*"]
+              methods: ["GET", "OPTIONS"]
+              headers: ["Content-Type", "Accept"]
+              exposed_headers: ["X-Request-Id"]
+              credentials: false
+              max_age: 3600
 
   - name: media-api-svc
     url: http://media-api:8285
@@ -193,7 +209,7 @@ services:
             config:
               origins: ["http://localhost", "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1"]
               methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-              headers: ["Authorization", "Content-Type", "X-API-Key", "Idempotency-Key", "X-Request-Id"]
+              headers: ["Authorization", "Content-Type", "X-API-Key", "X-Media-Service-Key", "x-media-service-key", "Idempotency-Key", "X-Request-Id"]
               exposed_headers: ["X-Request-Id", "X-Gateway-Auth"]
               credentials: true
               max_age: 3600
