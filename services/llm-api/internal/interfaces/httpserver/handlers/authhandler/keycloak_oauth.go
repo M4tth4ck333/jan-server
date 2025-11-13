@@ -191,7 +191,7 @@ func (h *KeycloakOAuthHandler) InitiateLogin(c *gin.Context) {
 
 	params := url.Values{}
 	params.Add("client_id", h.clientID)
-	params.Add("redirect_uri", redirectURL)
+	params.Add("redirect_uri", "https://api-gateway-dev.jan.ai/auth/callback")
 	params.Add("response_type", "code")
 	params.Add("scope", "openid profile email")
 	params.Add("state", state)
@@ -279,8 +279,9 @@ func (h *KeycloakOAuthHandler) HandleCallback(c *gin.Context) {
 	redirectURL := c.Query("redirect_url")
 	if redirectURL == "" {
 		// Default redirect URL if not provided
-		redirectURL = "http://localhost:3000/auth/callback"
+		redirectURL = "https://chat-dev.jan.ai/auth/keycloak/callback"
 	}
+	redirectURL = "https://chat-dev.jan.ai/auth/keycloak/callback"
 
 	// Parse the redirect URL to append tokens in fragment
 	parsedURL, err := url.Parse(redirectURL)
