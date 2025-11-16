@@ -9,7 +9,9 @@
 # QUICK START
 # ============================================================================================================
 #
+#   make quickstart     - Interactive setup and run (prompts for API keys, starts all services)
 #   make setup          - Initial project setup (dependencies, networks, .env)
+#   make cli-install    - Install jan-cli tool globally
 #   make build-all      - Build all Docker images
 #   make up-full        - Start all services (infrastructure + API + MCP)
 #   make dev-full       - Start all services with host.docker.internal support (for testing)
@@ -35,8 +37,8 @@
 #   8. HEALTH CHECKS             - Service health validation
 #
 # Documentation:
-#   📖 docs/guides/development.md - Complete development guide
-#   📖 README.md                  - Project overview and quick reference
+#   docs/guides/development.md - Complete development guide
+#   README.md                  - Project overview and quick reference
 #
 # ============================================================================================================
 # VARIABLES
@@ -60,38 +62,35 @@ MEDIA_API_KEY ?= changeme-media-key
 # SECTION 1: SETUP & ENVIRONMENT
 # ============================================================================================================
 
-.PHONY: setup check-deps install-deps ensure-docker-env
+.PHONY: setup check-deps install-deps ensure-docker-env setup-and-run quickstart
+
+setup-and-run quickstart:
+	@echo "Starting interactive setup and run..."
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File jan-cli.ps1 setup-and-run
+else
+	@bash jan-cli.sh setup-and-run
+endif
 
 setup:
+	@echo "Running setup via jan-cli..."
 ifeq ($(OS),Windows_NT)
-	@powershell -ExecutionPolicy Bypass -File scripts/setup.ps1
+	@powershell -ExecutionPolicy Bypass -File jan-cli.ps1 dev setup
 else
-	@bash scripts/setup.sh
+	@bash jan-cli.sh dev setup
 endif
 
 # Ensure docker/.env exists by copying from root .env
 ensure-docker-env:
-ifeq ($(OS),Windows_NT)
-	@if not exist docker mkdir docker >nul 2>&1
-	@copy .env docker\.env >nul 2>&1
-else
-	@mkdir -p docker
-	@cp .env docker/.env
-endif
+	@if not exist docker mkdir docker 2>nul
+	@copy /Y .env docker\.env >nul 2>&1 || echo Skipped copying .env
 
 check-deps:
 	@echo "Checking dependencies..."
-ifeq ($(OS),Windows_NT)
-	@docker --version >nul 2>&1 || echo "Docker not found"
-	@docker compose version >nul 2>&1 || echo "Docker Compose V2 not found"
-	@go version >nul 2>&1 || echo "Go not found (optional)"
-	@newman --version >nul 2>&1 || echo "Newman not found (optional)"
-else
 	@docker --version >/dev/null 2>&1 || echo "Docker not found"
 	@docker compose version >/dev/null 2>&1 || echo "Docker Compose V2 not found"
 	@go version >/dev/null 2>&1 || echo "Go not found (optional)"
 	@newman --version >/dev/null 2>&1 || echo "Newman not found (optional)"
-endif
 	@echo "Dependency check complete"
 
 install-deps:
@@ -112,17 +111,29 @@ build-api: build-llm-api build-media-api
 
 build-llm-api:
 	@echo "Building LLM API..."
+ifeq ($(OS),Windows_NT)
+	@cd services/llm-api && go build -o bin/llm-api.exe ./cmd/server
+else
 	@cd services/llm-api && go build -o bin/llm-api ./cmd/server
+endif
 	@echo " LLM API built: services/llm-api/bin/llm-api"
 
 build-media-api:
 	@echo "Building Media API..."
+ifeq ($(OS),Windows_NT)
+	@cd services/media-api && go build -o bin/media-api.exe ./cmd/server
+else
 	@cd services/media-api && go build -o bin/media-api ./cmd/server
+endif
 	@echo " Media API built: services/media-api/bin/media-api"
 
 build-mcp:
 	@echo "Building MCP Tools..."
+ifeq ($(OS),Windows_NT)
+	@cd services/mcp-tools && go build -o bin/mcp-tools.exe .
+else
 	@cd services/mcp-tools && go build -o bin/mcp-tools .
+endif
 	@echo " MCP Tools built: services/mcp-tools/bin/mcp-tools"
 
 build-all:
@@ -132,10 +143,74 @@ build-all:
 
 clean-build:
 	@echo "Cleaning build artifacts..."
-	@rm -rf services/llm-api/bin
-	@rm -rf services/media-api/bin
-	@rm -rf services/mcp-tools/bin
-	@echo " Build artifacts cleaned"
+	@if exist services\llm-api\bin rmdir /s /q services\llm-api\bin 2>nul
+	@if exist services\media-api\bin rmdir /s /q services\media-api\bin 2>nul
+	@if exist services\mcp-tools\bin rmdir /s /q services\mcp-tools\bin 2>nul
+	@echo "✓ Build artifacts cleaned"
+
+# --- Configuration Management ---
+
+.PHONY: config-generate config-test config-drift-check config-help
+
+config-generate:
+	@echo "Generating configuration files from Go structs..."
+	@cd cmd/jan-cli && go run . config generate
+	@echo " Configuration files generated:"
+	@echo "  - config/defaults.yaml (auto-generated)"
+	@echo "  - config/schema/*.schema.json (auto-generated)"
+
+config-test:
+	@echo "Running configuration tests..."
+	@cd pkg/config && go test -v ./...
+	@echo " Configuration tests passed"
+
+config-drift-check:
+	@echo "Checking for configuration drift..."
+	@cd cmd/jan-cli && go run . config generate && git diff --exit-code ../../config/
+	@if [ $$? -eq 0 ]; then \
+		echo " No configuration drift detected"; \
+	else \
+		echo " Configuration drift detected! Run 'make config-generate' to update."; \
+		exit 1; \
+	fi
+
+config-help:
+	@echo "Configuration Management Targets:"
+	@echo "  config-generate      Generate config files from Go structs (YAML, JSON schema)"
+	@echo "  config-test         Run configuration package tests"
+	@echo "  config-drift-check  Verify generated files are in sync with code"
+	@echo ""
+	@echo "Files auto-generated by config-generate:"
+	@echo "  - config/defaults.yaml                Default configuration values"
+	@echo "  - config/schema/*.schema.json         JSON Schemas for validation"
+	@echo ""
+	@echo "Usage:"
+	@echo "  1. Update pkg/config/types.go with your configuration changes"
+	@echo "  2. Run 'make config-generate' to regenerate all files"
+	@echo "  3. Run 'make config-test' to verify changes"
+	@echo "  4. Use 'make config-drift-check' in CI to prevent drift"
+
+# --- CLI Tool ---
+
+.PHONY: cli-install cli-build cli-clean
+
+cli-build:
+	@echo "Building jan-cli..."
+	@cd cmd/jan-cli && go build -o jan-cli$(if $(filter Windows_NT,$(OS)),.exe,) .
+	@echo " jan-cli built successfully"
+
+cli-install: cli-build
+	@echo "Installing jan-cli to local bin directory..."
+ifeq ($(OS),Windows_NT)
+	@cmd/jan-cli/jan-cli.exe install
+else
+	@cmd/jan-cli/jan-cli install
+endif
+
+cli-clean:
+	@echo "Cleaning jan-cli binary..."
+	@rm -f cmd/jan-cli/jan-cli cmd/jan-cli/jan-cli.exe
+	@echo " jan-cli binary removed"
 
 # --- Swagger Documentation ---
 
@@ -144,61 +219,55 @@ clean-build:
 swagger:
 	@echo "Generating Swagger documentation for all services..."
 ifeq ($(OS),Windows_NT)
-	@powershell -ExecutionPolicy Bypass -File scripts/generate-swagger.ps1
+	@powershell -ExecutionPolicy Bypass -File jan-cli.ps1 swagger generate --combine
 else
-	@bash scripts/generate-swagger.sh
+	@bash jan-cli.sh swagger generate --combine
 endif
-	@echo ""
-	@echo "Combining swagger specs..."
-	@$(MAKE) swagger-combine
 
 swagger-llm-api:
 	@echo "Generating Swagger for llm-api service..."
-	@cd services/llm-api && go run github.com/swaggo/swag/cmd/swag@v1.8.12 init \
-		--dir ./cmd/server,./internal/interfaces/httpserver/routes \
-		--generalInfo server.go \
-		--output ./docs/swagger \
-		--parseDependency \
-		--parseInternal
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File jan-cli.ps1 swagger generate -s llm-api
+else
+	@bash jan-cli.sh swagger generate -s llm-api
+endif
 	@echo " llm-api swagger generated at services/llm-api/docs/swagger"
 
 swagger-media-api:
 	@echo "Generating Swagger for media-api service..."
-	@cd services/media-api && go run github.com/swaggo/swag/cmd/swag@v1.8.12 init \
-		--dir ./cmd/server,./internal/interfaces/httpserver/handlers,./internal/interfaces/httpserver/routes/v1 \
-		--generalInfo server.go \
-		--output ./docs/swagger \
-		--parseDependency \
-		--parseInternal
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File jan-cli.ps1 swagger generate -s media-api
+else
+	@bash jan-cli.sh swagger generate -s media-api
+endif
 	@echo " media-api swagger generated at services/media-api/docs/swagger"
 
 swagger-mcp-tools:
 	@echo "Generating Swagger for mcp-tools service..."
-	@cd services/mcp-tools && go run github.com/swaggo/swag/cmd/swag@v1.8.12 init \
-		--dir . \
-		--generalInfo main.go \
-		--output ./docs/swagger \
-		--parseDependency \
-		--parseInternal
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File jan-cli.ps1 swagger generate -s mcp-tools
+else
+	@bash jan-cli.sh swagger generate -s mcp-tools
+endif
 	@echo " mcp-tools swagger generated at services/mcp-tools/docs/swagger"
 
 swagger-response-api:
 	@echo "Generating Swagger for response-api service..."
-	@cd services/response-api && go run github.com/swaggo/swag/cmd/swag@v1.8.12 init \
-		--dir ./cmd/server,./internal/interfaces/httpserver/handlers,./internal/interfaces/httpserver/routes/v1 \
-		--generalInfo server.go \
-		--output ./docs/swagger \
-		--parseDependency \
-		--parseInternal
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File jan-cli.ps1 swagger generate -s response-api
+else
+	@bash jan-cli.sh swagger generate -s response-api
+endif
 	@echo " response-api swagger generated at services/response-api/docs/swagger"
 
 swagger-combine:
-	@echo "Merging LLM API and MCP Tools swagger specs..."
-	@go run scripts/swagger-combine.go \
-		-llm-api services/llm-api/docs/swagger/swagger.json \
-		-mcp-tools services/mcp-tools/docs/swagger/swagger.json \
-		-output services/llm-api/docs/swagger/swagger-combined.json
-	@echo " Combined swagger created for unified API documentation"
+	@echo \"Merging LLM API and MCP Tools swagger specs...\"
+ifeq ($(OS),Windows_NT)
+	@powershell -ExecutionPolicy Bypass -File jan-cli.ps1 swagger combine
+else
+	@bash jan-cli.sh swagger combine
+endif
+	@echo \" Combined swagger created for unified API documentation\"
 
 swagger-install:
 	@echo "Installing swagger tools..."
@@ -333,9 +402,9 @@ logs-vllm:
 .PHONY: up-full down-full restart-full logs stop down down-clean dev-full dev-full-down dev-full-stop
 
 up-full: ensure-docker-env ## Start full stack (all services in Docker)
-	@echo "Starting full stack..."
-	$(COMPOSE) --profile full up -d
-	@echo " Full stack started"
+	@echo "Starting services (based on COMPOSE_PROFILES in .env)..."
+	$(COMPOSE) up -d
+	@echo " Services started"
 	@echo ""
 	@echo "Infrastructure:"
 	@echo "  - PostgreSQL: localhost:5432"
@@ -345,20 +414,20 @@ up-full: ensure-docker-env ## Start full stack (all services in Docker)
 	@echo "Services:"
 	@echo "  - LLM API:        http://localhost:8080"
 	@echo "  - MCP Tools:      http://localhost:8091"
-	@echo "  - SearXNG:        http://localhost:8086"
 	@echo "  - Vector Store:   http://localhost:3015"
-	@echo "  - SandboxFusion:  http://localhost:3010"
-	@echo "  - vLLM GPU:       http://localhost:8101"
+	@echo "  - vLLM (if enabled): http://localhost:8101"
+	@echo ""
+	@echo "Note: vLLM only starts if using local GPU provider (COMPOSE_PROFILES=full)"
 
 down-full:
-	$(COMPOSE) --profile full down
+	$(COMPOSE) down
 
 restart-full:
-	$(COMPOSE) --profile full restart
+	$(COMPOSE) restart
 
 stop:
 	@echo "Stopping all services (containers will be preserved)..."
-	$(COMPOSE) --profile full stop
+	$(COMPOSE) stop
 	@echo " All services stopped (containers preserved)"
 	@echo ""
 	@echo "To restart: make up-full"
@@ -366,7 +435,7 @@ stop:
 
 down:
 	@echo "Stopping and removing all containers (volumes will be preserved)..."
-	$(COMPOSE) --profile full down
+	$(COMPOSE) down
 	@echo " All containers stopped and removed (volumes preserved)"
 	@echo ""
 	@echo "To restart: make up-full"
@@ -374,7 +443,7 @@ down:
 
 down-clean:
 	@echo "Stopping and removing all containers and volumes..."
-	$(COMPOSE) --profile full down -v
+	$(COMPOSE) down -v
 	@echo " All containers and volumes removed (full cleanup)"
 	@echo ""
 	@echo "To restart: make up-full"
@@ -413,7 +482,7 @@ db-reset:
 	@echo "Stopping and removing API database..."
 	$(COMPOSE) stop api-db
 	$(COMPOSE) rm -f api-db
-	@docker volume rm jan-server_api-db-data || true
+	@docker volume rm jan-server_api-db-data 2>nul || echo Volume removed or didn't exist
 	@echo " Database reset complete. Run 'make up-api' to restart."
 
 db-migrate:
@@ -615,9 +684,9 @@ dev-full: ensure-docker-env ## Start development full stack with host.docker.int
 	@echo ""
 	@echo "  2. Run on host:"
 ifeq ($(OS),Windows_NT)
-	@echo "     .\\scripts\\dev-full-run.ps1 llm-api"
+	@echo "     jan-cli dev run llm-api"
 else
-	@echo "     ./scripts/dev-full-run.sh llm-api"
+	@echo "     jan-cli dev run llm-api"
 endif
 	@echo ""
 	@echo "  3. Kong will automatically route requests to your host service"
@@ -658,9 +727,12 @@ ifeq ($(OS),Windows_NT)
 	@echo.
 	@echo [MCP Services]
 	@powershell -Command "try { $$null = Invoke-WebRequest -Uri http://localhost:8091/healthz -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host '  MCP Tools:      healthy' } catch { Write-Host '  MCP Tools:      unhealthy' }"
-	@powershell -Command "try { $$null = Invoke-WebRequest -Uri http://localhost:8086 -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host '  SearXNG:        healthy' } catch { Write-Host '  SearXNG:        unhealthy' }"
 	@powershell -Command "try { $$null = Invoke-WebRequest -Uri http://localhost:3015/healthz -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host '  Vector Store:   healthy' } catch { Write-Host '  Vector Store:   unhealthy' }"
-	@powershell -Command "try { $$null = Invoke-WebRequest -Uri http://localhost:3010 -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host '  SandboxFusion:  healthy' } catch { Write-Host '  SandboxFusion:  unhealthy' }"
+	@echo.
+	@echo [Optional Services - may show unhealthy if disabled]
+	@powershell -Command "try { $$null = Invoke-WebRequest -Uri http://localhost:8086 -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host '  SearXNG:        healthy' } catch { Write-Host '  SearXNG:        not running' }"
+	@powershell -Command "try { $$null = Invoke-WebRequest -Uri http://localhost:3010 -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host '  SandboxFusion:  healthy' } catch { Write-Host '  SandboxFusion:  not running' }"
+	@powershell -Command "try { $$null = Invoke-WebRequest -Uri http://localhost:8101/v1/models -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop; Write-Host '  vLLM:           healthy' } catch { Write-Host '  vLLM:           not running' }"
 	@echo ============================================
 else
 	@echo "============================================"
@@ -678,9 +750,12 @@ else
 	@echo ""
 	@echo "[MCP Services]"
 	@curl -sf http://localhost:8091/healthz >/dev/null && echo "  MCP Tools:      healthy" || echo "  MCP Tools:      unhealthy"
-	@curl -sf http://localhost:8086 >/dev/null && echo "  SearXNG:        healthy" || echo "  SearXNG:        unhealthy"
-	@curl -sf http://localhost:3015/healthz >/dev/null && echo "  Vector Store:   healthy" || echo "  V ector Store:   unhealthy"
-	@curl -sf http://localhost:3010 >/dev/null && echo "  SandboxFusion:  healthy" || echo "  SandboxFusion:  unhealthy"
+	@curl -sf http://localhost:3015/healthz >/dev/null && echo "  Vector Store:   healthy" || echo "  Vector Store:   unhealthy"
+	@echo ""
+	@echo "[Optional Services - may show 'not running' if disabled]"
+	@curl -sf http://localhost:8086 >/dev/null && echo "  SearXNG:        healthy" || echo "  SearXNG:        not running"
+	@curl -sf http://localhost:3010 >/dev/null && echo "  SandboxFusion:  healthy" || echo "  SandboxFusion:  not running"
+	@curl -sf http://localhost:8101/v1/models >/dev/null && echo "  vLLM:           healthy" || echo "  vLLM:           not running"
 	@echo ""
 	@echo "============================================"
 endif
