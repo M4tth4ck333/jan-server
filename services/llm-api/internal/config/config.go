@@ -87,6 +87,18 @@ type Config struct {
 	MediaResolveURL     string        `env:"MEDIA_RESOLVE_URL" envDefault:"http://kong:8000/media/v1/media/resolve"`
 	MediaResolveTimeout time.Duration `env:"MEDIA_RESOLVE_TIMEOUT" envDefault:"5s"`
 
+	// Prompt Orchestration
+	PromptOrchestrationEnabled         bool   `env:"PROMPT_ORCHESTRATION_ENABLED" envDefault:"true"`
+	PromptOrchestrationEnableMemory    bool   `env:"PROMPT_ORCHESTRATION_MEMORY" envDefault:"true"`
+	PromptOrchestrationEnableTemplates bool   `env:"PROMPT_ORCHESTRATION_TEMPLATES" envDefault:"true"`
+	PromptOrchestrationEnableTools     bool   `env:"PROMPT_ORCHESTRATION_TOOLS" envDefault:"false"`
+	PromptOrchestrationDefaultPersona  string `env:"PROMPT_ORCHESTRATION_PERSONA" envDefault:"helpful assistant"`
+
+	// Memory integration
+	MemoryEnabled bool          `env:"MEMORY_ENABLED" envDefault:"true"`
+	MemoryBaseURL string        `env:"MEMORY_BASE_URL" envDefault:"http://memory-tools:8090"`
+	MemoryTimeout time.Duration `env:"MEMORY_TIMEOUT" envDefault:"5s"`
+
 	// Internal
 	EnvReloadedAt time.Time
 }

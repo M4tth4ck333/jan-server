@@ -18,10 +18,12 @@ var setupAndRunCmd = &cobra.Command{
 
 func init() {
 	setupAndRunCmd.Flags().Bool("skip-prompts", false, "Skip interactive prompts and use existing .env")
+	setupAndRunCmd.Flags().Bool("with-memory-tools", false, "Enable memory tools profile and defaults during setup")
 }
 
 func runSetupAndRun(cmd *cobra.Command, args []string) error {
 	skipPrompts, _ := cmd.Flags().GetBool("skip-prompts")
+	enableMemory, _ := cmd.Flags().GetBool("with-memory-tools")
 
 	fmt.Println("🚀 Jan Server Setup and Run")
 	fmt.Println("=" + strings.Repeat("=", 50))
@@ -43,10 +45,11 @@ func runSetupAndRun(cmd *cobra.Command, args []string) error {
 			response, _ := reader.ReadString('\n')
 			response = strings.TrimSpace(strings.ToLower(response))
 
+			// Default is No for updating existing config
 			if response != "y" && response != "yes" {
 				fmt.Println("Using existing .env file...")
 			} else {
-				if err := promptForEnvVars(envPath); err != nil {
+				if err := promptForEnvVars(envPath, enableMemory); err != nil {
 					return fmt.Errorf("failed to update .env: %w", err)
 				}
 			}
@@ -57,7 +60,7 @@ func runSetupAndRun(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to copy .env template: %w", err)
 			}
 
-			if err := promptForEnvVars(envPath); err != nil {
+			if err := promptForEnvVars(envPath, enableMemory); err != nil {
 				return fmt.Errorf("failed to configure .env: %w", err)
 			}
 		}
@@ -66,6 +69,12 @@ func runSetupAndRun(cmd *cobra.Command, args []string) error {
 		fmt.Println("📝 Creating .env from template...")
 		if err := copyEnvTemplate(envPath); err != nil {
 			return fmt.Errorf("failed to copy .env template: %w", err)
+		}
+	}
+
+	if skipPrompts && enableMemory {
+		if err := applyMemoryDefaults(envPath); err != nil {
+			return fmt.Errorf("failed to enable memory tools defaults: %w", err)
 		}
 	}
 
@@ -92,12 +101,14 @@ func runSetupAndRun(cmd *cobra.Command, args []string) error {
 		fmt.Println("  • Jaeger (distributed tracing)")
 		fmt.Println("  • OpenTelemetry Collector")
 		fmt.Println()
+		fmt.Println()
 		fmt.Print("Set up monitoring? (y/N): ")
 
 		reader := bufio.NewReader(os.Stdin)
 		monitorResponse, _ := reader.ReadString('\n')
 		monitorResponse = strings.TrimSpace(strings.ToLower(monitorResponse))
 
+		// Default is No for monitoring (optional feature)
 		if monitorResponse == "y" || monitorResponse == "yes" {
 			fmt.Println()
 			fmt.Println("🔧 Installing monitoring dependencies...")
@@ -193,7 +204,7 @@ func copyEnvTemplate(destPath string) error {
 	return nil
 }
 
-func promptForEnvVars(envPath string) error {
+func promptForEnvVars(envPath string, defaultEnableMemory bool) error {
 	reader := bufio.NewReader(os.Stdin)
 
 	fmt.Println()
@@ -201,13 +212,10 @@ func promptForEnvVars(envPath string) error {
 	fmt.Println()
 
 	// Read current .env
-	data, err := os.ReadFile(envPath)
-	if err != nil {
+	if _, err := os.ReadFile(envPath); err != nil {
 		return fmt.Errorf("read .env: %w", err)
 	}
 
-	content := string(data)
-	lines := strings.Split(content, "\n")
 	updates := make(map[string]string)
 
 	// 1. LLM Provider Configuration
@@ -307,7 +315,33 @@ func promptForEnvVars(envPath string) error {
 		fmt.Println("✓ MCP search disabled (Vector Store still available)")
 	}
 
-	// 3. Media API Configuration
+	// 3. Memory Tools Configuration
+	fmt.Println()
+	fmt.Println("🧠 Memory Tools Setup")
+	fmt.Println("Enable memory tools for long-term context and retrieval.")
+	memoryPromptDefault := "Y/n"
+	if !defaultEnableMemory {
+		memoryPromptDefault = "y/N"
+	}
+	fmt.Printf("Enable memory tools? (%s): ", memoryPromptDefault)
+
+	memoryChoice, _ := reader.ReadString('\n')
+	memoryChoice = strings.TrimSpace(strings.ToLower(memoryChoice))
+
+	// Default based on defaultEnableMemory flag (Y/n or y/N)
+	enableMemory := defaultEnableMemory
+	if memoryChoice != "" {
+		enableMemory = memoryChoice != "n" && memoryChoice != "no"
+	}
+
+	externalEmbedding := false
+	useRedis := false
+	if enableMemory {
+		externalEmbedding, useRedis = configureMemoryOptions(reader, updates)
+	}
+	applyMemorySettings(updates, &profiles, enableMemory, externalEmbedding, useRedis)
+
+	// 4. Media API Configuration
 	fmt.Println()
 	fmt.Println("🖼️  Media API Setup")
 
@@ -320,6 +354,7 @@ func promptForEnvVars(envPath string) error {
 		mediaChoice, _ := reader.ReadString('\n')
 		mediaChoice = strings.TrimSpace(strings.ToLower(mediaChoice))
 
+		// Default is No for S3 with remote provider (requires credentials)
 		if mediaChoice == "y" || mediaChoice == "yes" {
 			updates["MEDIA_API_ENABLED"] = "true"
 			updates["MEDIA_STORAGE_BACKEND"] = "s3"
@@ -384,6 +419,7 @@ func promptForEnvVars(envPath string) error {
 		mediaChoice, _ := reader.ReadString('\n')
 		mediaChoice = strings.TrimSpace(strings.ToLower(mediaChoice))
 
+		// Default is Yes for Media API with local vLLM
 		if mediaChoice == "n" || mediaChoice == "no" {
 			updates["MEDIA_API_ENABLED"] = "false"
 			fmt.Println("✓ Media API disabled")
@@ -469,6 +505,20 @@ func promptForEnvVars(envPath string) error {
 	// Apply all updates
 	fmt.Println()
 
+	// Ensure Keycloak URLs are properly set for browser access
+	if _, exists := updates["KEYCLOAK_PUBLIC_URL"]; !exists {
+		updates["KEYCLOAK_PUBLIC_URL"] = "http://localhost:8085"
+	}
+	if _, exists := updates["KEYCLOAK_ADMIN_URL"]; !exists {
+		updates["KEYCLOAK_ADMIN_URL"] = "http://localhost:8085"
+	}
+	if _, exists := updates["KEYCLOAK_BASE_URL"]; !exists {
+		updates["KEYCLOAK_BASE_URL"] = "http://keycloak:8085"
+	}
+	if _, exists := updates["ISSUER"]; !exists {
+		updates["ISSUER"] = "http://localhost:8085/realms/jan"
+	}
+
 	// Set COMPOSE_PROFILES based on enabled services
 	if len(profiles) > 0 {
 		updates["COMPOSE_PROFILES"] = strings.Join(profiles, ",")
@@ -480,31 +530,8 @@ func promptForEnvVars(envPath string) error {
 	}
 
 	if len(updates) > 0 {
-		for i, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			// Skip comments and empty lines
-			if strings.HasPrefix(trimmed, "#") || trimmed == "" {
-				continue
-			}
-
-			// Check each update
-			for key, value := range updates {
-				if strings.HasPrefix(trimmed, key+"=") {
-					lines[i] = fmt.Sprintf("%s=%s", key, value)
-					delete(updates, key) // Mark as applied
-				}
-			}
-		}
-
-		// Add any remaining updates that weren't found
-		for key, value := range updates {
-			lines = append(lines, fmt.Sprintf("%s=%s", key, value))
-		}
-
-		// Write back
-		newContent := strings.Join(lines, "\n")
-		if err := os.WriteFile(envPath, []byte(newContent), 0644); err != nil {
-			return fmt.Errorf("write .env: %w", err)
+		if err := applyEnvUpdates(envPath, updates); err != nil {
+			return err
 		}
 
 		fmt.Println("✓ Configuration saved to .env")
@@ -513,12 +540,160 @@ func promptForEnvVars(envPath string) error {
 	}
 
 	// Check if using local vLLM (look in updates or re-read from env)
-	data, _ = os.ReadFile(envPath)
+	data, _ := os.ReadFile(envPath)
 	if strings.Contains(string(data), "COMPOSE_PROFILES=full") {
 		os.Setenv("_USING_LOCAL_VLLM", "true")
 	}
 
 	return nil
+}
+
+func applyEnvUpdates(envPath string, updates map[string]string) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		return fmt.Errorf("read .env: %w", err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	pending := make(map[string]string, len(updates))
+	for key, value := range updates {
+		pending[key] = value
+	}
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") || trimmed == "" {
+			continue
+		}
+
+		for key, value := range pending {
+			if strings.HasPrefix(trimmed, key+"=") {
+				lines[i] = fmt.Sprintf("%s=%s", key, value)
+				delete(pending, key)
+			}
+		}
+	}
+
+	for key, value := range pending {
+		lines = append(lines, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	newContent := strings.Join(lines, "\n")
+	if err := os.WriteFile(envPath, []byte(newContent), 0644); err != nil {
+		return fmt.Errorf("write .env: %w", err)
+	}
+
+	return nil
+}
+
+func applyMemoryDefaults(envPath string) error {
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		return fmt.Errorf("read .env: %w", err)
+	}
+
+	profiles := parseProfiles(strings.Split(string(data), "\n"))
+	updates := make(map[string]string)
+	setMemoryDefaults(updates, &profiles, false, false)
+	if len(profiles) > 0 {
+		updates["COMPOSE_PROFILES"] = strings.Join(profiles, ",")
+	}
+
+	return applyEnvUpdates(envPath, updates)
+}
+
+func applyMemorySettings(updates map[string]string, profiles *[]string, enable bool, externalEmbedding bool, useRedis bool) {
+	if enable {
+		setMemoryDefaults(updates, profiles, externalEmbedding, useRedis)
+		fmt.Println("Memory tools enabled (profile: memory)")
+	} else {
+		updates["MEMORY_TOOLS_ENABLED"] = "false"
+		fmt.Println("Memory tools disabled (enable later by editing .env)")
+	}
+}
+
+func setMemoryDefaults(updates map[string]string, profiles *[]string, externalEmbedding bool, useRedis bool) {
+	if profiles != nil {
+		hasMemory := false
+		hasMock := false
+		hasRedis := false
+		for _, profile := range *profiles {
+			if profile == "memory" {
+				hasMemory = true
+			}
+			if profile == "memory-mock" {
+				hasMock = true
+			}
+			if profile == "memory-redis" {
+				hasRedis = true
+			}
+		}
+		if !hasMemory {
+			*profiles = append(*profiles, "memory")
+		}
+		if !externalEmbedding && !hasMock {
+			*profiles = append(*profiles, "memory-mock")
+		}
+		if useRedis && !hasRedis {
+			*profiles = append(*profiles, "memory-redis")
+		}
+	}
+
+	if _, exists := updates["MEMORY_TOOLS_PORT"]; !exists {
+		updates["MEMORY_TOOLS_PORT"] = "8090"
+	}
+
+	if !externalEmbedding && updates["EMBEDDING_SERVICE_URL"] == "" {
+		updates["EMBEDDING_SERVICE_URL"] = "http://bge-m3:8091"
+	}
+
+	updates["MEMORY_TOOLS_ENABLED"] = "true"
+	updates["EMBEDDING_CACHE_TYPE"] = "memory"
+	updates["PROMPT_ORCHESTRATION_MEMORY"] = "true"
+}
+
+func configureMemoryOptions(reader *bufio.Reader, updates map[string]string) (bool, bool) {
+	fmt.Println()
+	fmt.Println("Memory Embedding Service")
+	fmt.Println("Use the built-in BGE-M3 mock (default) or point to your own embedding endpoint.")
+	fmt.Print("Custom embedding service URL (leave blank for http://bge-m3:8091): ")
+	customURL, _ := reader.ReadString('\n')
+	customURL = strings.TrimSpace(customURL)
+	external := false
+	if customURL != "" {
+		updates["EMBEDDING_SERVICE_URL"] = customURL
+		external = true
+	} else if _, exists := updates["EMBEDDING_SERVICE_URL"]; !exists {
+		updates["EMBEDDING_SERVICE_URL"] = "http://bge-m3:8091"
+	}
+
+	fmt.Println()
+	fmt.Println("Embedding Cache")
+	fmt.Println("Choose Redis for shared cache or in-memory for simplicity.")
+	fmt.Print("Use Redis cache? (y/N): ")
+	cacheChoice, _ := reader.ReadString('\n')
+	cacheChoice = strings.TrimSpace(strings.ToLower(cacheChoice))
+	// Default is No for Redis (in-memory is simpler for getting started)
+	useRedis := false
+	if cacheChoice == "y" || cacheChoice == "yes" {
+		updates["EMBEDDING_CACHE_TYPE"] = "redis"
+		fmt.Print("Redis URL (default: redis://redis-memory:6379/3): ")
+		redisURL, _ := reader.ReadString('\n')
+		redisURL = strings.TrimSpace(redisURL)
+		if redisURL == "" {
+			redisURL = "redis://redis-memory:6379/3"
+		}
+		updates["EMBEDDING_CACHE_REDIS_URL"] = redisURL
+		useRedis = true
+	} else {
+		updates["EMBEDDING_CACHE_TYPE"] = "memory"
+	}
+
+	return external, useRedis
 }
 
 func updateEnvVariable(envPath, key, value string) error {
@@ -560,11 +735,15 @@ func updateEnvVariable(envPath, key, value string) error {
 	return nil
 }
 
-func containsPrefix(lines []string, prefix string) bool {
+func parseProfiles(lines []string) []string {
 	for _, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
-			return true
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "COMPOSE_PROFILES=") {
+			value := strings.TrimPrefix(trimmed, "COMPOSE_PROFILES=")
+			if value != "" {
+				return strings.Split(value, ",")
+			}
 		}
 	}
-	return false
+	return []string{"infra", "api", "mcp"}
 }

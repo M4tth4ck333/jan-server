@@ -161,6 +161,7 @@ type ServicesConfig struct {
 	MCPTools    MCPToolsConfig    `yaml:"mcp_tools" json:"mcp_tools" jsonschema:"required"`
 	MediaAPI    MediaAPIConfig    `yaml:"media_api" json:"media_api" jsonschema:"required"`
 	ResponseAPI ResponseAPIConfig `yaml:"response_api" json:"response_api" jsonschema:"required"`
+	MemoryTools MemoryToolsConfig `yaml:"memory_tools" json:"memory_tools" jsonschema:"required"`
 }
 
 // LLMAPIConfig contains settings for the LLM API service
@@ -199,9 +200,30 @@ type LLMAPIConfig struct {
 	ModelSyncEnabled         bool `yaml:"model_sync_enabled" json:"model_sync_enabled" env:"MODEL_SYNC_ENABLED" envDefault:"true" description:"Enable model synchronization"`
 	ModelSyncIntervalMinutes int  `yaml:"model_sync_interval_minutes" json:"model_sync_interval_minutes" env:"MODEL_SYNC_INTERVAL_MINUTES" envDefault:"60" jsonschema:"minimum=1" description:"Model sync interval in minutes"`
 
+	// Prompt orchestration settings
+	PromptOrchestration PromptOrchestrationConfig `yaml:"prompt_orchestration" json:"prompt_orchestration"`
+
 	// Media integration
 	MediaResolveURL     string        `yaml:"media_resolve_url" json:"media_resolve_url" env:"MEDIA_RESOLVE_URL" envDefault:"http://kong:8000/media/v1/media/resolve" jsonschema:"format=uri" description:"Media resolve URL"`
 	MediaResolveTimeout time.Duration `yaml:"media_resolve_timeout" json:"media_resolve_timeout" env:"MEDIA_RESOLVE_TIMEOUT" envDefault:"5s" description:"Media resolve timeout"`
+}
+
+// PromptOrchestrationConfig contains settings for prompt orchestration processor
+type PromptOrchestrationConfig struct {
+	// Enable prompt orchestration
+	Enabled bool `yaml:"enabled" json:"enabled" env:"PROMPT_ORCHESTRATION_ENABLED" envDefault:"true" description:"Enable prompt orchestration processor"`
+
+	// Enable memory module
+	EnableMemory bool `yaml:"enable_memory" json:"enable_memory" env:"PROMPT_ORCHESTRATION_MEMORY" envDefault:"false" description:"Enable memory injection in prompts"`
+
+	// Enable templates module
+	EnableTemplates bool `yaml:"enable_templates" json:"enable_templates" env:"PROMPT_ORCHESTRATION_TEMPLATES" envDefault:"true" description:"Enable template-based prompts"`
+
+	// Enable tools module
+	EnableTools bool `yaml:"enable_tools" json:"enable_tools" env:"PROMPT_ORCHESTRATION_TOOLS" envDefault:"false" description:"Enable tool usage instructions"`
+
+	// Default persona
+	DefaultPersona string `yaml:"default_persona" json:"default_persona" env:"PROMPT_ORCHESTRATION_PERSONA" envDefault:"helpful assistant" description:"Default assistant persona"`
 }
 
 // APIKeyConfig contains API key management settings
@@ -419,4 +441,93 @@ type GrafanaConfig struct {
 type JaegerConfig struct {
 	// Jaeger UI port
 	UIPort int `yaml:"ui_port" json:"ui_port" env:"JAEGER_UI_PORT" envDefault:"16686" jsonschema:"minimum=1,maximum=65535" description:"Jaeger UI port"`
+}
+
+// MemoryToolsConfig contains settings for the Memory Tools service
+type MemoryToolsConfig struct {
+	// Enable memory tools
+	Enabled bool `yaml:"enabled" json:"enabled" env:"MEMORY_TOOLS_ENABLED" envDefault:"false" description:"Enable memory tools service"`
+
+	// HTTP port
+	HTTPPort int `yaml:"http_port" json:"http_port" env:"MEMORY_TOOLS_PORT" envDefault:"8090" jsonschema:"minimum=1,maximum=65535" description:"Memory Tools HTTP port"`
+
+	// Embedding service configuration
+	Embedding EmbeddingConfig `yaml:"embedding" json:"embedding"`
+}
+
+// EmbeddingConfig contains settings for the embedding service
+type EmbeddingConfig struct {
+	// Base URL for the embedding service
+	BaseURL string `yaml:"base_url" json:"base_url" env:"EMBEDDING_SERVICE_URL" jsonschema:"format=uri" description:"Embedding service base URL"`
+
+	// API key for the embedding service
+	APIKey string `yaml:"api_key,omitempty" json:"api_key,omitempty" env:"EMBEDDING_SERVICE_API_KEY" description:"Embedding service API key"`
+
+	// Timeout for embedding requests
+	Timeout time.Duration `yaml:"timeout" json:"timeout" env:"EMBEDDING_SERVICE_TIMEOUT" envDefault:"30s" description:"Embedding service timeout"`
+
+	// Validate server on startup
+	ValidateOnStartup bool `yaml:"validate_on_startup" json:"validate_on_startup" env:"EMBEDDING_VALIDATE_ON_STARTUP" envDefault:"true" description:"Validate embedding server on startup"`
+
+	// Expected model ID
+	ExpectedModel string `yaml:"expected_model" json:"expected_model" env:"EMBEDDING_EXPECTED_MODEL" envDefault:"BAAI/bge-m3" description:"Expected embedding model ID"`
+
+	// Expected embedding dimension
+	ExpectedDimension int `yaml:"expected_dimension" json:"expected_dimension" env:"EMBEDDING_EXPECTED_DIMENSION" envDefault:"1024" jsonschema:"minimum=1" description:"Expected embedding dimension"`
+
+	// Retry configuration
+	Retry RetryConfig `yaml:"retry" json:"retry"`
+
+	// Cache configuration
+	Cache CacheConfig `yaml:"cache" json:"cache"`
+
+	// Batch configuration
+	Batch BatchConfig `yaml:"batch" json:"batch"`
+
+	// Circuit breaker configuration
+	CircuitBreaker CircuitBreakerConfig `yaml:"circuit_breaker" json:"circuit_breaker"`
+}
+
+// RetryConfig contains retry settings
+type RetryConfig struct {
+	Enabled        bool          `yaml:"enabled" json:"enabled" env:"EMBEDDING_RETRY_ENABLED" envDefault:"true" description:"Enable retries"`
+	MaxAttempts    int           `yaml:"max_attempts" json:"max_attempts" env:"EMBEDDING_RETRY_MAX_ATTEMPTS" envDefault:"3" jsonschema:"minimum=1" description:"Maximum retry attempts"`
+	InitialBackoff time.Duration `yaml:"initial_backoff" json:"initial_backoff" env:"EMBEDDING_RETRY_INITIAL_BACKOFF" envDefault:"1s" description:"Initial retry backoff"`
+	MaxBackoff     time.Duration `yaml:"max_backoff" json:"max_backoff" env:"EMBEDDING_RETRY_MAX_BACKOFF" envDefault:"10s" description:"Maximum retry backoff"`
+}
+
+// CacheConfig contains cache settings
+type CacheConfig struct {
+	Enabled bool   `yaml:"enabled" json:"enabled" env:"EMBEDDING_CACHE_ENABLED" envDefault:"true" description:"Enable embedding cache"`
+	Type    string `yaml:"type" json:"type" env:"EMBEDDING_CACHE_TYPE" envDefault:"redis" jsonschema:"enum=redis,enum=memory,enum=noop" description:"Cache type (redis, memory, noop)"`
+	Redis   RedisCacheConfig `yaml:"redis" json:"redis"`
+	Memory  MemoryCacheConfig `yaml:"memory" json:"memory"`
+}
+
+// RedisCacheConfig contains Redis cache settings
+type RedisCacheConfig struct {
+	URL       string        `yaml:"url" json:"url" env:"EMBEDDING_CACHE_REDIS_URL" envDefault:"redis://redis:6379/3" jsonschema:"format=uri" description:"Redis connection URL"`
+	KeyPrefix string        `yaml:"key_prefix" json:"key_prefix" env:"EMBEDDING_CACHE_REDIS_PREFIX" envDefault:"emb:" description:"Redis key prefix"`
+	TTL       time.Duration `yaml:"ttl" json:"ttl" env:"EMBEDDING_CACHE_TTL" envDefault:"1h" description:"Cache TTL"`
+}
+
+// MemoryCacheConfig contains in-memory cache settings
+type MemoryCacheConfig struct {
+	MaxSize int           `yaml:"max_size" json:"max_size" env:"EMBEDDING_CACHE_MAX_SIZE" envDefault:"10000" jsonschema:"minimum=1" description:"Maximum cache size"`
+	TTL     time.Duration `yaml:"ttl" json:"ttl" env:"EMBEDDING_CACHE_TTL" envDefault:"1h" description:"Cache TTL"`
+}
+
+// BatchConfig contains batch processing settings
+type BatchConfig struct {
+	Enabled bool          `yaml:"enabled" json:"enabled" env:"EMBEDDING_BATCH_ENABLED" envDefault:"true" description:"Enable batch processing"`
+	MaxSize int           `yaml:"max_size" json:"max_size" env:"EMBEDDING_BATCH_MAX_SIZE" envDefault:"32" jsonschema:"minimum=1" description:"Maximum batch size"`
+	Timeout time.Duration `yaml:"timeout" json:"timeout" env:"EMBEDDING_BATCH_TIMEOUT" envDefault:"5s" description:"Batch timeout"`
+}
+
+// CircuitBreakerConfig contains circuit breaker settings
+type CircuitBreakerConfig struct {
+	Enabled       bool          `yaml:"enabled" json:"enabled" env:"EMBEDDING_CB_ENABLED" envDefault:"true" description:"Enable circuit breaker"`
+	Threshold     int           `yaml:"threshold" json:"threshold" env:"EMBEDDING_CB_THRESHOLD" envDefault:"5" jsonschema:"minimum=1" description:"Failure threshold"`
+	Timeout       time.Duration `yaml:"timeout" json:"timeout" env:"EMBEDDING_CB_TIMEOUT" envDefault:"30s" description:"Circuit breaker timeout"`
+	MaxConcurrent int           `yaml:"max_concurrent" json:"max_concurrent" env:"EMBEDDING_CB_MAX_CONCURRENT" envDefault:"100" jsonschema:"minimum=1" description:"Maximum concurrent requests"`
 }
