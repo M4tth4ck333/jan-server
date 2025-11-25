@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/google/wire"
 
+	"jan-server/services/llm-api/internal/interfaces/httpserver/handlers"
 	"jan-server/services/llm-api/internal/interfaces/httpserver/handlers/apikeyhandler"
 	"jan-server/services/llm-api/internal/interfaces/httpserver/handlers/authhandler"
 	"jan-server/services/llm-api/internal/interfaces/httpserver/handlers/chathandler"
@@ -10,6 +11,7 @@ import (
 	guestauth "jan-server/services/llm-api/internal/interfaces/httpserver/handlers/guesthandler"
 	"jan-server/services/llm-api/internal/interfaces/httpserver/handlers/modelhandler"
 	"jan-server/services/llm-api/internal/interfaces/httpserver/handlers/projecthandler"
+	"jan-server/services/llm-api/internal/interfaces/httpserver/handlers/usersettingshandler"
 	"jan-server/services/llm-api/internal/interfaces/httpserver/routes/auth"
 	v1 "jan-server/services/llm-api/internal/interfaces/httpserver/routes/v1"
 	"jan-server/services/llm-api/internal/interfaces/httpserver/routes/v1/admin"
@@ -20,6 +22,7 @@ import (
 	"jan-server/services/llm-api/internal/interfaces/httpserver/routes/v1/llm/projects"
 	"jan-server/services/llm-api/internal/interfaces/httpserver/routes/v1/model"
 	modelProvider "jan-server/services/llm-api/internal/interfaces/httpserver/routes/v1/model/provider"
+	"jan-server/services/llm-api/internal/interfaces/httpserver/routes/v1/users"
 )
 
 var RouteProvider = wire.NewSet(
@@ -28,6 +31,7 @@ var RouteProvider = wire.NewSet(
 	authhandler.NewTokenHandler,
 	authhandler.ProvideKeycloakOAuthHandler,
 	apikeyhandler.NewHandler,
+	handlers.ProvideMemoryHandler,
 	chathandler.NewChatHandler,
 	conversationhandler.NewConversationHandler,
 	guestauth.NewGuestHandler,
@@ -37,6 +41,7 @@ var RouteProvider = wire.NewSet(
 	modelhandler.NewModelCatalogHandler,
 	modelhandler.NewProviderModelHandler,
 	projecthandler.NewProjectHandler,
+	usersettingshandler.NewUserSettingsHandler,
 
 	// Routes
 	auth.NewAuthRoute,
@@ -50,4 +55,5 @@ var RouteProvider = wire.NewSet(
 	projects.NewProjectRoute,
 	model.NewModelRoute,
 	modelProvider.NewModelProviderRoute,
+	users.NewUsersRoute,
 )
