@@ -6,7 +6,6 @@ Validate the MCP (Model Context Protocol) toolchain end to end. Every command be
 
 - `make up-full` (or `make up-mcp` + `make up-api`) so Kong, MCP Tools, and vector-store are running
 - `SERPER_API_KEY` and other MCP-related env vars set in `.env`
-- `newman` installed (`npm install -g newman`)
 - Services reachable on:
   - Kong Gateway: http://localhost:8000
   - MCP Tools: http://localhost:8091 (direct) or http://localhost:8000/mcp (via Kong)
@@ -20,7 +19,7 @@ curl http://localhost:8091/healthz
 curl http://localhost:3015/healthz || true   # returns 404 because the vector store uses custom routes
 ```
 
-## 2. Automated Suite (Newman)
+## 2. Automated Suite (jan-cli api-test)
 
 Run everything through the Makefile target:
 
@@ -30,7 +29,7 @@ make test-mcp-integration
 
 The target executes:
 ```bash
-newman run tests/automation/mcp-postman-scripts.json \
+jan-cli api-test run tests/automation/mcp-postman-scripts.json \
   --env-var "kong_url=http://localhost:8000" \
   --env-var "mcp_tools_url=http://localhost:8000/mcp" \
   --verbose --reporters cli
