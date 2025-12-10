@@ -138,9 +138,6 @@ func NewSearchClient(cfg ClientConfig) *SearchClient {
 	if cfg.RetryInitialDelay > 0 {
 		retryConfig.InitialDelay = cfg.RetryInitialDelay
 	}
-	if cfg.RetryMaxDelay > 0 {
-		retryConfig.MaxDelay = cfg.RetryMaxDelay
-	}
 	if cfg.RetryBackoffFactor > 0 {
 		retryConfig.BackoffFactor = cfg.RetryBackoffFactor
 	}
