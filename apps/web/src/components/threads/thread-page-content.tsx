@@ -840,6 +840,9 @@ export function ThreadPageContent({
                     onRegenerate={conversationId ? handleRegenerate : undefined}
                   />
                 ))}
+                {status === CHAT_STATUS.SUBMITTED && (
+                  <Loader className="animate-spin" />
+                )}
                 {error && (
                   <div className="size-full mb-4 flex justify-center items-center">
                     <div className="text-center text-sm bg-muted rounded-full text-muted-foreground py-3 px-6 flex items-center gap-2 max-w-2xl">
