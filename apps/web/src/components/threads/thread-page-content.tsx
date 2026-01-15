@@ -844,10 +844,10 @@ export function ThreadPageContent({
                   <Loader className="animate-spin" />
                 )}
                 {error && (
-                  <div className="size-full mb-4 flex justify-center items-center">
-                    <div className="text-center text-sm bg-muted rounded-full text-muted-foreground py-3 px-6 flex items-center gap-2 max-w-2xl">
-                      <AlertTriangleIcon className="text-yellow-500 shrink-0" />
-                      <span>
+                  <div className="size-full mb-4 flex justify-center items-start">
+                    <div className="text-center text-sm bg-muted rounded-full text-muted-foreground py-3 px-6 flex items-start gap-2 max-w-2xl">
+                      <AlertTriangleIcon className="text-yellow-500 shrink-0 mt-0.5" />
+                      <span className="text-left">
                         {error.message || "Something seems to have gone wrong."}
                       </span>
                     </div>
