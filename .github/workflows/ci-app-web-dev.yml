@@ -21,11 +21,9 @@ jobs:
     with:
       runs-on: ubuntu-24-04-docker
       docker-file: apps/web/Dockerfile
-      context: apps/web
+      context: .
       registry-url: registry.menlo.ai
       tags: registry.menlo.ai/jan-server/web:dev-${{ github.sha }}
-      build-contexts: |
-        interfaces=packages/interfaces
       build-args: |
         JAN_BASE_URL=https://api-dev.jan.ai/v1
         JAN_API_BASE_URL=https://api-dev.jan.ai/

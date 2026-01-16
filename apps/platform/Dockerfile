@@ -1,16 +1,29 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Base image with pnpm
+FROM node:20-slim AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
+# Build stage
+FROM base AS builder
 WORKDIR /app
 
-# Copy all files
-COPY . .
+# Copy workspace files
+COPY pnpm-workspace.yaml package.json ./
+COPY .npmrc* ./
 
-# Install dependencies and build
-RUN npm install
+# Copy all workspace packages (needed for build dependencies)
+COPY apps/platform ./apps/platform
+
+# Install all dependencies
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install
+
+# Build arguments
 ARG NEXT_PUBLIC_JAN_BASE_URL
 ENV NEXT_PUBLIC_JAN_BASE_URL=$NEXT_PUBLIC_JAN_BASE_URL
-RUN npm run build
+
+# Build the platform app
+RUN pnpm build:platform
 
 # Production stage
 FROM node:20-alpine AS runner
@@ -25,18 +38,23 @@ ENV HOSTNAME="0.0.0.0"
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy built application and node_modules from builder with ownership
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+# Copy built application and dependencies from builder with ownership
+COPY --from=builder --chown=nextjs:nodejs /app/apps/platform/.next ./apps/platform/.next
+COPY --from=builder --chown=nextjs:nodejs /app/apps/platform/node_modules ./apps/platform/node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/apps/platform/package.json ./apps/platform/package.json
+COPY --from=builder --chown=nextjs:nodejs /app/apps/platform/next.config.mjs ./apps/platform/next.config.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/apps/platform/source.config.ts ./apps/platform/source.config.ts
+COPY --from=builder --chown=nextjs:nodejs /app/apps/platform/tsconfig.json ./apps/platform/tsconfig.json
+COPY --from=builder --chown=nextjs:nodejs /app/apps/platform/content ./apps/platform/content
+COPY --from=builder --chown=nextjs:nodejs /app/apps/platform/public ./apps/platform/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/platform/src ./apps/platform/src
+
+# Copy root node_modules for monorepo dependencies
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
-COPY --from=builder --chown=nextjs:nodejs /app/next.config.mjs ./next.config.mjs
-COPY --from=builder --chown=nextjs:nodejs /app/source.config.ts ./source.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/tsconfig.json ./tsconfig.json
-COPY --from=builder --chown=nextjs:nodejs /app/content ./content
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/src ./src
 
 USER nextjs
+
+WORKDIR /app/apps/platform
 
 EXPOSE 3000
 

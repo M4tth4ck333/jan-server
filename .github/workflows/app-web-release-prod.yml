@@ -35,8 +35,9 @@ jobs:
 
       - name: Install dependencies and build
         run: |
-          cd packages/interfaces/ && npm install --workspaces=false && cd ../../
-          cd apps/web/ && npm install --workspaces=false && npx vite build
+          pnpm install
+          pnpm build:interfaces
+          pnpm build:web
         env:
           JAN_BASE_URL: ${{ env.JAN_BASE_URL }}
           JAN_API_BASE_URL: ${{ env.JAN_API_BASE_URL }}
