@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"jan-server/services/response-api/internal/config"
 	"jan-server/services/response-api/internal/domain/agent"
 	"jan-server/services/response-api/internal/domain/artifact"
 	"jan-server/services/response-api/internal/domain/plan"
@@ -159,7 +160,7 @@ func (p *SlideGeneratorPlanner) CreatePlan(ctx context.Context, request *agent.P
 			Sequence:    taskSequence,
 			TaskType:    plan.TaskTypeResearch,
 			Title:       "Research",
-			Description: strPtr("Gather information and context for the presentation"),
+			Description: strPtr("Gather information and context for the topic of the presentation"),
 		})
 		if err != nil {
 			return nil, err
@@ -168,7 +169,7 @@ func (p *SlideGeneratorPlanner) CreatePlan(ctx context.Context, request *agent.P
 		// Step 1: Primary search
 		searchParams1, _ := json.Marshal(map[string]interface{}{
 			"tool":        "google_search",
-			"description": "Search for key topics related to the presentation",
+			"description": "Search for key ideas related to the topic for the presentation",
 			"q":           request.UserMessage, // Include user query for search
 		})
 		_, err = p.planService.CreateStep(ctx, researchTask.ID, plan.CreateStepParams{
@@ -303,6 +304,7 @@ func (p *SlideGeneratorPlanner) CreatePlan(ctx context.Context, request *agent.P
 			"tool":        "google_search",
 			"description": "Search for relevant images and graphics",
 			"search_type": "images",
+			"q":           request.UserMessage + " images",
 		})
 		_, err = p.planService.CreateStep(ctx, visualTask.ID, plan.CreateStepParams{
 			Sequence:    1,
@@ -680,6 +682,7 @@ func (e *SlideGeneratorExecutor) executeToolCall(ctx context.Context, step *plan
 	var result *tool.Result
 	if toolName == "aio_code_execute" {
 		var lastErr error
+		var lastResult *tool.Result
 		for attempt := 0; attempt < 5; attempt++ {
 			result, err = e.mcpClient.CallTool(ctx, tool.CallRequest{
 				Name:           toolName,
@@ -687,6 +690,9 @@ func (e *SlideGeneratorExecutor) executeToolCall(ctx context.Context, step *plan
 				RequestID:      requestID,
 				ConversationID: conversationID,
 			})
+			if result != nil {
+				lastResult = result
+			}
 			if err == nil && result != nil && !result.IsError {
 				lastErr = nil
 				break
@@ -707,6 +713,13 @@ func (e *SlideGeneratorExecutor) executeToolCall(ctx context.Context, step *plan
 			toolArgs = repairedArgs
 		}
 		if lastErr != nil {
+			if lastResult != nil && toolName == "aio_code_execute" {
+				logAioCodeExecuteResult(step.ID, lastResult)
+			}
+			var outputBytes []byte
+			if lastResult != nil {
+				outputBytes, _ = json.Marshal(lastResult)
+			}
 			log.Error().
 				Err(lastErr).
 				Str("tool", toolName).
@@ -715,6 +728,7 @@ func (e *SlideGeneratorExecutor) executeToolCall(ctx context.Context, step *plan
 				Msg("Tool call failed")
 			return &agent.ExecutionResult{
 				Status: status.StatusFailed,
+				Output: outputBytes,
 				Error: &agent.ExecutionError{
 					Code:     "TOOL_ERROR",
 					Message:  lastErr.Error(),
@@ -758,6 +772,9 @@ func (e *SlideGeneratorExecutor) executeToolCall(ctx context.Context, step *plan
 		Str("step_id", step.ID).
 		Bool("is_error", result.IsError).
 		Msg("Tool call completed")
+	if result != nil && result.IsError && toolName == "aio_code_execute" {
+		logAioCodeExecuteResult(step.ID, result)
+	}
 
 	// Handle tool errors for non-critical tools gracefully
 	if result != nil && result.IsError && isNonCriticalToolForSlides(toolName) {
@@ -811,6 +828,7 @@ func (e *SlideGeneratorExecutor) executeLLMCall(ctx context.Context, step *plan.
 		prompt = fmt.Sprintf(
 			"Generate an exact %d-slide JSON deck with theme '%s'. %s\n\n"+
 				"Return a single JSON object only (no markdown, no backticks, no commentary).\n"+
+				"Do not include comments (// or /* */) anywhere in the JSON.\n"+
 				"Output must start with '{' and end with '}'.\n"+
 				"Top-level keys must be exactly: deck, slides.\n"+
 				"Do not use a top-level array. Do not add a 'presentation' wrapper.\n"+
@@ -1080,7 +1098,7 @@ func (e *SlideGeneratorExecutor) executeArtifactCreation(ctx context.Context, st
 
 	artifactID := createdArtifact.ID
 	// Always expose the response-api artifact endpoint for downloads.
-	downloadURL = fmt.Sprintf("/v1/artifacts/%s/download", createdArtifact.ID)
+	downloadURL = fmt.Sprintf("/responses/v1/artifacts/%s/download", createdArtifact.ID)
 
 	// Create StepOutput with proper Artifact field for ExtractArtifacts to find
 	stepOutput := &plan.StepOutput{
@@ -1221,7 +1239,7 @@ func (e *SlideGeneratorExecutor) uploadSkillArtifact(ctx context.Context, step *
 			ID:          createdArtifact.ID,
 			Type:        string(contentType),
 			Filename:    fileName,
-			DownloadURL: fmt.Sprintf("/v1/artifacts/%s/download", createdArtifact.ID),
+			DownloadURL: fmt.Sprintf("/responses/v1/artifacts/%s/download", createdArtifact.ID),
 			Size:        int64(len(decoded)),
 			ContentType: mimeType,
 		},
@@ -1246,24 +1264,35 @@ func (e *SlideGeneratorExecutor) uploadRenderedArtifact(ctx context.Context, ste
 			},
 		}, nil
 	}
-	if renderOutput == nil || strings.TrimSpace(renderOutput.OutputPath) == "" {
+	if renderOutput == nil {
 		return &agent.ExecutionResult{
 			Status: status.StatusFailed,
 			Error: &agent.ExecutionError{
 				Code:     "FILE_MISSING",
-				Message:  "no render output file available for upload",
+				Message:  "no render output available for upload",
 				Severity: status.ErrorSeverityRetryable,
 			},
 		}, nil
 	}
 
-	decoded, err := e.readBinaryFileFromSandbox(ctx, renderOutput.OutputPath, input)
+	if strings.TrimSpace(renderOutput.Base64) == "" {
+		return &agent.ExecutionResult{
+			Status: status.StatusFailed,
+			Error: &agent.ExecutionError{
+				Code:     "FILE_MISSING",
+				Message:  "render output missing base64 payload",
+				Severity: status.ErrorSeverityRetryable,
+			},
+		}, nil
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(renderOutput.Base64)
 	if err != nil {
 		return &agent.ExecutionResult{
 			Status: status.StatusFailed,
 			Error: &agent.ExecutionError{
 				Code:     "FILE_READ_ERROR",
-				Message:  err.Error(),
+				Message:  fmt.Sprintf("base64 decode failed: %v", err),
 				Severity: status.ErrorSeverityRetryable,
 			},
 		}, nil
@@ -1336,7 +1365,7 @@ func (e *SlideGeneratorExecutor) uploadRenderedArtifact(ctx context.Context, ste
 			ID:          createdArtifact.ID,
 			Type:        string(contentType),
 			Filename:    fileName,
-			DownloadURL: fmt.Sprintf("/v1/artifacts/%s/download", createdArtifact.ID),
+			DownloadURL: fmt.Sprintf("/responses/v1/artifacts/%s/download", createdArtifact.ID),
 			Size:        int64(len(decoded)),
 			ContentType: mimeType,
 		},
@@ -1966,49 +1995,12 @@ func (e *SlideGeneratorExecutor) extractSlideSpecFromOutputs(input agent.Executi
 			}
 		}
 	}
-	for i := len(candidates) - 1; i >= 0; i-- {
-		content, _ := extractOutputContentAndAction(candidates[i])
-		cleaned := strings.TrimSpace(extractJSONFromMarkdown(content))
-		if isSlideSpecJSON(cleaned) {
-			return cleaned
-		}
-		if payload := extractJSONPayload(content); payload != "" && isSlideSpecJSON(payload) {
-			return strings.TrimSpace(payload)
-		}
-	}
 	return ""
 }
 
 func (e *SlideGeneratorExecutor) extractSlideSpecCandidate(input agent.ExecutionInput) string {
 	if content := strings.TrimSpace(e.extractSlideSpecFromOutputs(input)); content != "" {
 		return content
-	}
-	if content := strings.TrimSpace(e.extractJSONFromOutputs(input)); content != "" {
-		return content
-	}
-
-	candidates := make([]json.RawMessage, 0, 1+len(input.AccumulatedOutputs))
-	if len(input.PreviousOutput) > 0 {
-		candidates = append(candidates, input.PreviousOutput)
-	}
-	candidates = append(candidates, input.AccumulatedOutputs...)
-
-	for i := len(candidates) - 1; i >= 0; i-- {
-		content, action := extractOutputContentAndAction(candidates[i])
-		if action != "generate_slides_json" {
-			continue
-		}
-		cleaned := strings.TrimSpace(extractJSONFromMarkdown(content))
-		if cleaned != "" {
-			return cleaned
-		}
-	}
-	for i := len(candidates) - 1; i >= 0; i-- {
-		content, _ := extractOutputContentAndAction(candidates[i])
-		cleaned := strings.TrimSpace(extractJSONFromMarkdown(content))
-		if cleaned != "" {
-			return cleaned
-		}
 	}
 	return ""
 }
@@ -2062,6 +2054,7 @@ type slideRenderOutput struct {
 	OutputPath string `json:"output_path"`
 	FileName   string `json:"file_name"`
 	MimeType   string `json:"mime_type"`
+	Base64     string `json:"base64,omitempty"`
 }
 
 func extractSlideRenderOutput(previousOutput json.RawMessage) *slideRenderOutput {
@@ -2087,6 +2080,47 @@ type codeExecuteResult struct {
 	Stdout   string `json:"stdout"`
 	Stderr   string `json:"stderr"`
 	ExitCode int    `json:"exit_code"`
+}
+
+func logAioCodeExecuteResult(stepID string, result *tool.Result) {
+	if result == nil {
+		return
+	}
+	if strings.TrimSpace(result.Error) != "" {
+		log.Error().
+			Str("tool", "aio_code_execute").
+			Str("step_id", stepID).
+			Str("error", result.Error).
+			Msg("AIO code execute tool error")
+	}
+	for _, item := range result.Content {
+		text := strings.TrimSpace(item.Text)
+		if text == "" {
+			continue
+		}
+		log.Info().
+			Str("tool", "aio_code_execute").
+			Str("step_id", stepID).
+			Str("raw", text).
+			Msg("AIO code execute output")
+		var execResult codeExecuteResult
+		if err := json.Unmarshal([]byte(text), &execResult); err == nil {
+			if strings.TrimSpace(execResult.Stdout) != "" {
+				log.Info().
+					Str("tool", "aio_code_execute").
+					Str("step_id", stepID).
+					Str("stdout", execResult.Stdout).
+					Msg("AIO code execute stdout")
+			}
+			if strings.TrimSpace(execResult.Stderr) != "" {
+				log.Error().
+					Str("tool", "aio_code_execute").
+					Str("step_id", stepID).
+					Str("stderr", execResult.Stderr).
+					Msg("AIO code execute stderr")
+			}
+		}
+	}
 }
 
 func parseSlideRenderOutputFromText(text string) *slideRenderOutput {
@@ -2124,7 +2158,7 @@ func parseSlideRenderOutputJSON(payload string) *slideRenderOutput {
 }
 
 func extractJSONPayload(text string) string {
-	cleaned := strings.TrimSpace(text)
+	cleaned := strings.TrimSpace(stripJSONComments(text))
 	if cleaned == "" {
 		return ""
 	}
@@ -2674,8 +2708,8 @@ func buildSlideRenderCode(slideSpec string, specPath string, scriptPath string, 
 		imageURL = "https://www.jan.ai/_next/static/media/cute-robot-flying.1479447f.png"
 	}
 
-	pythonBodyTemplate := `import subprocess, sys
-import os, json
+pythonBodyTemplate := `import subprocess, sys
+import os, json, base64
 import urllib.request
 import shutil
 try:
@@ -2922,6 +2956,25 @@ def add_chart(slide, chart_spec):
     chart = slide.shapes.add_chart(chart_type, Inches(x), Inches(y), Inches(w), Inches(h), chart_data).chart
     chart.has_legend = bool(chart_spec.get("show_legend", False))
 
+def normalize_bullets(item):
+    bullets = item.get("bullets")
+    if isinstance(bullets, list) and bullets:
+        return [str(b) for b in bullets]
+    if isinstance(bullets, str) and bullets:
+        return [bullets]
+    content = item.get("content")
+    if isinstance(content, list) and content:
+        return [str(b) for b in content]
+    if isinstance(content, str) and content:
+        return [content]
+    focus = item.get("contentFocus")
+    if isinstance(focus, str) and focus:
+        return [focus]
+    purpose = item.get("purpose")
+    if isinstance(purpose, str) and purpose:
+        return [purpose]
+    return []
+
 blank_layout = prs.slide_layouts[6]
 
 for item in slides:
@@ -2938,6 +2991,18 @@ for item in slides:
         apply_text_color(title_para, color_from_hex(item.get("title_text"), title_text))
         apply_text_color(subtitle_para, color_from_hex(item.get("subtitle_text"), title_text))
         add_logo(slide, item.get("logo", "logo"), 11.2, 0.2, 1.6)
+        extra_lines = normalize_bullets(item)
+        if extra_lines:
+            add_textbox(
+                slide,
+                "\n".join(extra_lines),
+                1.0,
+                4.2,
+                11.0,
+                1.6,
+                18,
+                color_from_hex(item.get("text"), title_text),
+            )
     elif slide_type == "section":
         slide = prs.slides.add_slide(blank_layout)
         set_bg(slide, color_from_hex(item.get("bg"), body_bg))
@@ -2964,6 +3029,19 @@ for item in slides:
                 0.6,
                 22,
                 color_from_hex(item.get("subtitle_text"), body_text),
+                align="center",
+            )
+        extra_lines = normalize_bullets(item)
+        if extra_lines:
+            add_textbox(
+                slide,
+                "\n".join(extra_lines),
+                1.0,
+                4.4,
+                11.3,
+                1.3,
+                18,
+                color_from_hex(item.get("text"), body_text),
                 align="center",
             )
     elif slide_type == "bullets":
@@ -3263,14 +3341,17 @@ for item in slides:
             )
 
 prs.save(r"%s")
+with open(r"%s", "rb") as f:
+    encoded = base64.b64encode(f.read()).decode("ascii")
 print(json.dumps({
     "output_path": r"%s",
     "file_name": file_name,
-    "mime_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    "mime_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "base64": encoded
 }))
 `
 
-	codeBody := fmt.Sprintf(pythonBodyTemplate, imageURL, specPath, outputPath, outputPath, outputPath)
+	codeBody := fmt.Sprintf(pythonBodyTemplate, imageURL, specPath, outputPath, outputPath, outputPath, outputPath)
 	specB64 := base64.StdEncoding.EncodeToString([]byte(slideSpec))
 	scriptB64 := base64.StdEncoding.EncodeToString([]byte(codeBody))
 	pythonExecTemplate := `import base64, os

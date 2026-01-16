@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import ChatInput from "@/components/chat-input";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
+import { AppSidebarRight } from "@/components/sidebar/app-sidebar-right";
 import { SidebarInset } from "@/components/sidebar/sidebar";
 import { NavHeader } from "@/components/sidebar/nav-header";
 import { useChat } from "@/hooks/use-chat";
@@ -18,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConversations } from "@/stores/conversation-store";
 import { mcpService } from "@/services/mcp-service";
 import { useCapabilities } from "@/stores/capabilities-store";
+import { useAgentExecutionStore } from "@/stores/agent-execution-store";
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import type { UIDataTypes, UIMessage, UITools } from "ai";
 import { MessageItem } from "./message-item";
@@ -230,10 +232,7 @@ export function ThreadPageContent({
           (e) => e.type === CONTENT_TYPE.TEXT && e.text.length > 0,
         );
 
-      // Track if run_agent was called - if so, stop the chat after execution
       let ranAgent = false;
-
-      // After finishing a message, check if we need to resubmit for tool calls
       Promise.all(
         sessionData.tools.map(async (toolCall: any) => {
           // Check if already aborted before starting
@@ -279,28 +278,119 @@ export function ThreadPageContent({
               errorText: `Error: ${result.error}`,
             });
           } else {
-            // If this was run_agent, abort the controller BEFORE addToolOutput to prevent auto-follow-up
-            // addToolOutput triggers state update which evaluates sendAutomaticallyWhen immediately
             if (toolCall.toolName === "run_agent") {
               toolCallAbortController.current?.abort();
-            }
 
-            addToolOutput({
-              tool: toolCall.toolName,
-              toolCallId: toolCall.toolCallId,
-              output: result.content,
-            });
+              try {
+                const content = result.content;
+                if (Array.isArray(content) && content.length > 0) {
+                  const textContent = content.find((c) => c.type === "text");
+                  if (textContent && textContent.text) {
+                    const agentResult = JSON.parse(textContent.text);
+                    const responseId = agentResult.id || agentResult.response_id;
+                    if (responseId) {
+                      const inProgressOutput = [{ type: "text", text: JSON.stringify({
+                        status: "in_progress",
+                        response_id: responseId,
+                        message: "Deep research started"
+                      })}];
+
+                      addToolOutput({
+                        tool: toolCall.toolName,
+                        toolCallId: toolCall.toolCallId,
+                        output: inProgressOutput,
+                      });
+
+                      // Persist tool result to backend so it's available on reload
+                      if (conversationId && !isPrivateChat) {
+                        createItems(conversationId, [
+                          {
+                            type: "message",
+                            role: MESSAGE_ROLE.TOOL,
+                            content: [{
+                              type: "tool_result",
+                              tool_call_id: toolCall.toolCallId,
+                              tool_result: JSON.stringify({
+                                status: "in_progress",
+                                response_id: responseId,
+                                message: "Deep research started"
+                              }),
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            } as any],
+                          },
+                        ]).catch((err) => {
+                          console.error("Failed to persist agent tool result:", err);
+                        });
+                      }
+
+                      startExecution(responseId, (execution) => {
+                        let finalReport = "";
+                        if (execution.status === "completed" && execution.planDetails) {
+                          const reportTask = execution.planDetails.tasks.find(
+                            (t) => t.title === "Report" || t.task_type === "generation"
+                          );
+                          if (reportTask?.steps) {
+                            const llmStep = reportTask.steps.find((s) => s.action === "llm_call");
+                            if (llmStep?.output_data) {
+                              const outputData = llmStep.output_data as Record<string, unknown>;
+                              finalReport = (outputData.content as string) || "";
+                            }
+                          }
+                        }
+
+                        const agentOutput = finalReport
+                          ? [{ type: "text", text: JSON.stringify({
+                              status: execution.status,
+                              response_id: responseId,
+                              report: finalReport,
+                              message: "Deep research completed. Here is the comprehensive analysis:"
+                            })}]
+                          : [{ type: "text", text: JSON.stringify({
+                              status: execution.status,
+                              response_id: responseId,
+                              error: execution.error || "Agent execution failed or was cancelled"
+                            })}];
+
+                        addToolOutput({
+                          tool: toolCall.toolName,
+                          toolCallId: toolCall.toolCallId,
+                          output: agentOutput,
+                        });
+
+                        setTimeout(() => {
+                          sendMessage();
+                        }, 100);
+                      });
+
+                      return;
+                    }
+                  }
+                }
+              } catch (parseError) {
+                console.error("Failed to parse run_agent result:", parseError);
+              }
+
+              // If we couldn't parse the response, add the original output
+              addToolOutput({
+                tool: toolCall.toolName,
+                toolCallId: toolCall.toolCallId,
+                output: result.content,
+              });
+            } else {
+              addToolOutput({
+                tool: toolCall.toolName,
+                toolCallId: toolCall.toolCallId,
+                output: result.content,
+              });
+            }
           }
         }),
       )
         .then(() => {
-          // If run_agent was called, stop the chat - don't continue with follow-up
           if (ranAgent) {
-            console.log("Agent was executed, stopping chat flow");
             return;
           }
 
-          // Continue generate if need follow up on a blank message
           if (needFollowUp) {
             sendMessage();
           } else if (conversationId && !isPrivateChat && !hadToolCalls) {
@@ -620,10 +710,26 @@ export function ThreadPageContent({
     }
   }, [conversationId, models.length, isPrivateChat]);
 
+  // Agent execution store actions
+  const startExecution = useAgentExecutionStore(
+    (state) => state.startExecution,
+  );
+  const clearExecution = useAgentExecutionStore(
+    (state) => state.clearExecution,
+  );
+
   // Reset state when conversation changes
   useEffect(() => {
     initialMessageSentRef.current = false;
   }, [conversationId]);
+
+  useEffect(() => {
+    return () => {
+      if (conversationId) {
+        clearExecution(conversationId);
+      }
+    };
+  }, [conversationId, clearExecution]);
 
   useEffect(() => {
     const initialMessageKey = isPrivateChat
@@ -838,6 +944,7 @@ export function ThreadPageContent({
                     status={status}
                     reasoningContainerRef={reasoningContainerRef}
                     onRegenerate={conversationId ? handleRegenerate : undefined}
+                    conversationId={conversationId}
                   />
                 ))}
                 {status === CHAT_STATUS.SUBMITTED && (
@@ -870,6 +977,7 @@ export function ThreadPageContent({
           </div>
         </div>
       </SidebarInset>
+      <AppSidebarRight />
     </>
   );
 }
