@@ -61,8 +61,5 @@
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4"
-  },
-  "overrides": {
-    "form-data": "^4.0.1"
   }
 }

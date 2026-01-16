@@ -32,6 +32,12 @@ infra/k8s/**/*-secret.yaml.local
 # Local configuration that shouldn't be shared
 *.local
 
+### pnpm ###
+# pnpm store and cache
+.pnpm-store/
+.pnpm-debug.log*
+pnpm-lock.yaml
+
 ### Vscode ###
 # Visual Studio Code editor settings and workspace files
 
