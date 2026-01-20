@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { extractUserFromTokens } from "@/lib/oauth";
 import { fetchJsonWithAuth } from "@/lib/api-client";
+import { analytics } from "@/lib/analytics";
 
 declare const JAN_API_BASE_URL: string;
 
@@ -42,6 +43,15 @@ export const useAuth = create<AuthState>()(
           accessToken: userData.accessToken,
           refreshToken: userData.refreshToken,
         });
+
+        analytics.identify(userData.id, {
+          email: userData.email,
+          name: userData.name,
+        });
+        analytics.capture("user_logged_in", {
+          method: "google",
+          is_new_user: false,
+        });
       },
       logout: async () => {
         try {
@@ -53,6 +63,9 @@ export const useAuth = create<AuthState>()(
               body: JSON.stringify({ refresh_token: refreshToken }),
             },
           );
+
+          analytics.capture("user_logged_out");
+          analytics.reset();
 
           // Clear all stores
           const { useProjects } = await import("@/stores/projects-store");
