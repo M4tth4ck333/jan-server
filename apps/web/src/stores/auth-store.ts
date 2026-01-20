@@ -44,10 +44,7 @@ export const useAuth = create<AuthState>()(
           refreshToken: userData.refreshToken,
         });
 
-        analytics.identify(userData.id, {
-          email: userData.email,
-          name: userData.name,
-        });
+        analytics.identify(userData.id);
         analytics.capture("user_logged_in", {
           method: "google",
           is_new_user: false,
