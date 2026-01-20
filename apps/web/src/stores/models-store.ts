@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { modelService } from "@/services/models-service";
+import { analytics } from "@/lib/analytics";
 
 let fetchPromise: Promise<void> | null = null;
 
@@ -40,8 +41,20 @@ export const useModels = create<ModelState>((set, get) => ({
     return fetchPromise;
   },
   setSelectedModel: async (model: Model) => {
+    const previousModel = get().selectedModel;
     set({ selectedModel: model });
     if (!model) return;
+
+    if (previousModel?.id !== model.id) {
+      const { useAuth } = await import("@/stores/auth-store");
+      const isAuthenticated = useAuth.getState().isAuthenticated;
+      analytics.capture("model_selected", {
+        model: model.id,
+        previous_model: previousModel?.id || null,
+        user_status: analytics.getUserStatus(isAuthenticated),
+      });
+    }
+
     if (get().modelDetail.id === model.id) {
       return;
     }
