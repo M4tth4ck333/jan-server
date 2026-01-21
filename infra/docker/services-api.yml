@@ -2,7 +2,9 @@
 
 services:
   llm-api:
-    build: ../../services/llm-api
+    build:
+      context: ../..
+      dockerfile: services/llm-api/Dockerfile
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}
@@ -93,18 +95,20 @@ services:
     profiles: ["api", "full"]
 
   media-api:
-    build: ../../services/media-api
+    build:
+      context: ../..
+      dockerfile: services/media-api/Dockerfile
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}
     environment:
       # HTTP Server (using service-specific port)
       MEDIA_API_PORT: ${MEDIA_API_PORT:-8285}
-      
+
       # Database (using default account)
       DB_POSTGRESQL_WRITE_DSN: ${MEDIA_DB_POSTGRESQL_WRITE_DSN:-postgres://${POSTGRES_USER:-jan_user}:${POSTGRES_PASSWORD:-jan_password}@${POSTGRES_HOST:-api-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-jan_llm_api}?sslmode=disable}
       DB_POSTGRESQL_READ1_DSN: ${MEDIA_DB_POSTGRESQL_READ1_DSN:-}
-      
+
       # S3 Storage
       MEDIA_S3_ENDPOINT: ${MEDIA_S3_ENDPOINT:-https://s3.menlo.ai}
       MEDIA_S3_PUBLIC_ENDPOINT: ${MEDIA_S3_PUBLIC_ENDPOINT:-}
@@ -114,21 +118,31 @@ services:
       MEDIA_S3_SECRET_ACCESS_KEY: ${MEDIA_S3_SECRET_ACCESS_KEY:-YYYY}
       MEDIA_S3_USE_PATH_STYLE: ${MEDIA_S3_USE_PATH_STYLE:-true}
       MEDIA_S3_PRESIGN_TTL: ${MEDIA_S3_PRESIGN_TTL:-168h}
-      
+
       # Media Configuration
       MEDIA_MAX_UPLOAD_BYTES: ${MEDIA_MAX_UPLOAD_BYTES:-20971520}
       MEDIA_PROXY_DOWNLOAD: ${MEDIA_PROXY_DOWNLOAD:-true}
       MEDIA_RETENTION_DAYS: ${MEDIA_RETENTION_DAYS:-30}
       MEDIA_REMOTE_FETCH_TIMEOUT: ${MEDIA_REMOTE_FETCH_TIMEOUT:-15s}
-      
+
       # Logging
       MEDIA_LOG_LEVEL: ${MEDIA_LOG_LEVEL:-info}
-      
+
       # Authentication
       AUTH_ENABLED: "true"
       AUTH_ISSUER: ${ISSUER:-http://localhost:8085/realms/jan}
       ACCOUNT: ${ACCOUNT:-account}
       AUTH_JWKS_URL: ${JWKS_URL:-http://keycloak:8085/realms/jan/protocol/openid-connect/certs}
+
+      # Analytics (PostHog + OTel)
+      ANALYTICS_ENABLED: ${ANALYTICS_ENABLED:-true}
+      POSTHOG_ENABLED: ${POSTHOG_ENABLED:-false}
+      POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
+      POSTHOG_HOST: ${POSTHOG_HOST:-https://eu.posthog.com}
+      OTEL_ANALYTICS: ${OTEL_ANALYTICS:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      ANALYTICS_PII_LEVEL: ${ANALYTICS_PII_LEVEL:-hashed}
+      ANALYTICS_ENVIRONMENT: ${ANALYTICS_ENVIRONMENT:-dev}
     ports:
       - "${MEDIA_API_PORT:-8285}:${MEDIA_API_PORT:-8285}"
     depends_on:
@@ -146,7 +160,9 @@ services:
     profiles: ["api", "full"]
 
   response-api:
-    build: ../../services/response-api
+    build:
+      context: ../..
+      dockerfile: services/response-api/Dockerfile
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}

@@ -52,7 +52,7 @@ type Config struct {
 	APIKeySecret     []byte        `env:"APIKEY_SECRET"`
 	APIKeyDefaultTTL time.Duration `env:"API_KEY_DEFAULT_TTL" envDefault:"2160h"` // 90 days
 	APIKeyMaxTTL     time.Duration `env:"API_KEY_MAX_TTL" envDefault:"2160h"`
-	APIKeyMaxPerUser int           `env:"API_KEY_MAX_PER_USER" envDefault:"5"`
+	APIKeyMaxPerUser int           `env:"API_KEY_MAX_PER_USER" envDefault:"50"`
 	APIKeyPrefix     string        `env:"API_KEY_PREFIX" envDefault:"sk_live"`
 	KongAdminURL     string        `env:"KONG_ADMIN_URL" envDefault:"http://kong:8001"`
 
@@ -117,6 +117,18 @@ type Config struct {
 	ImageDefaultStyle          string        `env:"IMAGE_DEFAULT_STYLE" envDefault:"natural"`
 	ImageDefaultResponseFormat string        `env:"IMAGE_DEFAULT_RESPONSE_FORMAT" envDefault:"url"`
 	ImageMediaPresignTTL       time.Duration `env:"IMAGE_MEDIA_PRESIGN_TTL" envDefault:"1h"`
+
+	// Analytics (PostHog + OTel)
+	AnalyticsEnabled     bool          `env:"ANALYTICS_ENABLED" envDefault:"true"`
+	PostHogEnabled       bool          `env:"POSTHOG_ENABLED" envDefault:"false"`
+	PostHogAPIKey        string        `env:"POSTHOG_API_KEY"`
+	PostHogHost          string        `env:"POSTHOG_HOST" envDefault:"https://eu.posthog.com"`
+	PostHogDebug         bool          `env:"POSTHOG_DEBUG" envDefault:"false"`
+	PostHogBatchSize     int           `env:"POSTHOG_BATCH_SIZE" envDefault:"100"`
+	PostHogFlushInterval time.Duration `env:"POSTHOG_FLUSH_INTERVAL" envDefault:"10s"`
+	OTelAnalyticsEnabled bool          `env:"OTEL_ANALYTICS" envDefault:"false"`
+	AnalyticsPIILevel    string        `env:"ANALYTICS_PII_LEVEL" envDefault:"hashed"`
+	AnalyticsEnvironment string        `env:"ANALYTICS_ENVIRONMENT" envDefault:"dev"`
 
 	// Internal
 	EnvReloadedAt time.Time

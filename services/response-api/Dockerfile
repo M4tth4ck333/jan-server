@@ -3,9 +3,17 @@ ARG GO_VERSION=1.25
 FROM golang:${GO_VERSION} as build
 
 WORKDIR /src
-COPY go.mod go.sum ./
+
+# Copy go-common first (dependency)
+COPY packages/go-common /packages/go-common
+
+# Copy service module files
+COPY services/response-api/go.mod services/response-api/go.sum ./
 RUN go mod download
-COPY . .
+
+# Copy service source
+COPY services/response-api ./
+RUN go mod tidy
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/response-api ./cmd/server
 
 FROM debian:bookworm-slim
