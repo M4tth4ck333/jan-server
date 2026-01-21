@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"log"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -51,13 +53,28 @@ func DefaultConfig(tracker analytics.Tracker) Config {
 	}
 }
 
+// isPathExcluded checks if a path should be excluded from tracking
+// Supports both exact matches and prefix matches (paths ending with *)
+func isPathExcluded(path string, excludePaths []string) bool {
+	for _, excludePath := range excludePaths {
+		if strings.HasSuffix(excludePath, "*") {
+			// Prefix match
+			prefix := strings.TrimSuffix(excludePath, "*")
+			if strings.HasPrefix(path, prefix) {
+				return true
+			}
+		} else {
+			// Exact match
+			if path == excludePath {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // Analytics returns a Gin middleware that adds analytics context to requests
 func Analytics(cfg Config) gin.HandlerFunc {
-	excludePathMap := make(map[string]bool)
-	for _, p := range cfg.ExcludePaths {
-		excludePathMap[p] = true
-	}
-
 	return func(c *gin.Context) {
 		start := time.Now()
 
@@ -87,7 +104,7 @@ func Analytics(cfg Config) gin.HandlerFunc {
 		c.Next()
 
 		// Track HTTP request if enabled
-		if cfg.TrackHTTPRequests && !excludePathMap[c.Request.URL.Path] {
+		if cfg.TrackHTTPRequests && !isPathExcluded(c.Request.URL.Path, cfg.ExcludePaths) {
 			trackHTTPRequest(c, cfg.Tracker, distinctID, userStatus, platform, start)
 		}
 	}
@@ -128,8 +145,11 @@ func extractDistinctID(c *gin.Context, customExtractor func(*gin.Context) string
 func trackHTTPRequest(c *gin.Context, tracker analytics.Tracker, distinctID, userStatus, platform string, start time.Time) {
 	if distinctID == "" {
 		// Don't track requests without distinct ID
+		log.Printf("[analytics] Skipping tracking for %s %s - no distinct ID", c.Request.Method, c.Request.URL.Path)
 		return
 	}
+
+	log.Printf("[analytics] Tracking HTTP request: %s %s for user %s", c.Request.Method, c.Request.URL.Path, distinctID)
 
 	event := analytics.NewEvent(analytics.EventHTTPRequest, distinctID).
 		WithProperties(map[string]interface{}{
@@ -147,7 +167,9 @@ func trackHTTPRequest(c *gin.Context, tracker analytics.Tracker, distinctID, use
 
 	// Fire and forget - don't block on analytics
 	go func() {
-		_ = tracker.Track(c.Request.Context(), event)
+		if err := tracker.Track(c.Request.Context(), event); err != nil {
+			log.Printf("[analytics] Error tracking event: %v", err)
+		}
 	}()
 }
 
