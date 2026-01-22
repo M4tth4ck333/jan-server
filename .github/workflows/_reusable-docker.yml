@@ -35,7 +35,7 @@ on:
       build-contexts:
         required: false
         type: string
-        default: ""
+        default: "go-common=packages/go-common"
         description: "Additional build contexts (e.g., name=path)"
       tags:
         required: false
