@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"log"
 	"strings"
 	"time"
 
@@ -144,12 +143,8 @@ func extractDistinctID(c *gin.Context, customExtractor func(*gin.Context) string
 // trackHTTPRequest tracks an HTTP request event
 func trackHTTPRequest(c *gin.Context, tracker analytics.Tracker, distinctID, userStatus, platform string, start time.Time) {
 	if distinctID == "" {
-		// Don't track requests without distinct ID
-		log.Printf("[analytics] Skipping tracking for %s %s - no distinct ID", c.Request.Method, c.Request.URL.Path)
 		return
 	}
-
-	log.Printf("[analytics] Tracking HTTP request: %s %s for user %s", c.Request.Method, c.Request.URL.Path, distinctID)
 
 	event := analytics.NewEvent(analytics.EventHTTPRequest, distinctID).
 		WithProperties(map[string]interface{}{
@@ -167,9 +162,7 @@ func trackHTTPRequest(c *gin.Context, tracker analytics.Tracker, distinctID, use
 
 	// Fire and forget - don't block on analytics
 	go func() {
-		if err := tracker.Track(c.Request.Context(), event); err != nil {
-			log.Printf("[analytics] Error tracking event: %v", err)
-		}
+		_ = tracker.Track(c.Request.Context(), event)
 	}()
 }
 

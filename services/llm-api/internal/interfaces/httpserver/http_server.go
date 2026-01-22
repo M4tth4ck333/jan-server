@@ -127,17 +127,10 @@ func NewHttpServer(
 	server.engine.Use(middleware.CORSMiddleware())
 	server.engine.Use(middleware.MetricsMiddleware())
 
-	// Analytics middleware - tracks HTTP requests and adds tracker to context
+	// Analytics middleware - adds tracker and user context to requests
 	server.engine.Use(analyticsMiddleware.Analytics(analyticsMiddleware.Config{
 		Tracker:           tracker,
-		TrackHTTPRequests: true,
-		ExcludePaths: []string{
-			"/healthz",
-			"/healthcheck",
-			"/readyz",
-			"/metrics",
-			"/api/swagger*", // Wildcard to exclude all swagger paths
-		},
+		TrackHTTPRequests: false,
 		ExtractDistinctID: extractUserIDFromJWT,
 	}))
 

@@ -52,7 +52,7 @@ type Config struct {
 	APIKeySecret     []byte        `env:"APIKEY_SECRET"`
 	APIKeyDefaultTTL time.Duration `env:"API_KEY_DEFAULT_TTL" envDefault:"2160h"` // 90 days
 	APIKeyMaxTTL     time.Duration `env:"API_KEY_MAX_TTL" envDefault:"2160h"`
-	APIKeyMaxPerUser int           `env:"API_KEY_MAX_PER_USER" envDefault:"50"`
+	APIKeyMaxPerUser int           `env:"API_KEY_MAX_PER_USER" envDefault:"5"`
 	APIKeyPrefix     string        `env:"API_KEY_PREFIX" envDefault:"sk_live"`
 	KongAdminURL     string        `env:"KONG_ADMIN_URL" envDefault:"http://kong:8001"`
 
