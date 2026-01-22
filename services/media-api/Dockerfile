@@ -3,20 +3,9 @@ ARG GO_VERSION=1.25
 FROM golang:${GO_VERSION} as build
 
 WORKDIR /src
-
-# Copy go-common package first (for replace directive)
-COPY packages/go-common /packages/go-common
-
-# Copy service module files and download dependencies
-COPY services/media-api/go.mod services/media-api/go.sum ./
+COPY go.mod go.sum ./
 RUN go mod download
-
-# Copy service source code
-COPY services/media-api ./
-
-# Ensure dependencies are in sync
-RUN go mod tidy
-
+COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/media-api ./cmd/server
 
 FROM debian:bookworm-slim
