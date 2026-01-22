@@ -72,9 +72,7 @@ services:
 
   # MCP Tools API - Unified MCP interface
   mcp-tools:
-    build:
-      context: ../..
-      dockerfile: services/mcp-tools/Dockerfile
+    build: ../../services/mcp-tools
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}

@@ -2,9 +2,7 @@
 
 services:
   llm-api:
-    build:
-      context: ../..
-      dockerfile: services/llm-api/Dockerfile
+    build: ../../services/llm-api
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}
@@ -95,20 +93,18 @@ services:
     profiles: ["api", "full"]
 
   media-api:
-    build:
-      context: ../..
-      dockerfile: services/media-api/Dockerfile
+    build: ../../services/media-api
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}
     environment:
       # HTTP Server (using service-specific port)
       MEDIA_API_PORT: ${MEDIA_API_PORT:-8285}
-
+      
       # Database (using default account)
       DB_POSTGRESQL_WRITE_DSN: ${MEDIA_DB_POSTGRESQL_WRITE_DSN:-postgres://${POSTGRES_USER:-jan_user}:${POSTGRES_PASSWORD:-jan_password}@${POSTGRES_HOST:-api-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-jan_llm_api}?sslmode=disable}
       DB_POSTGRESQL_READ1_DSN: ${MEDIA_DB_POSTGRESQL_READ1_DSN:-}
-
+      
       # S3 Storage
       MEDIA_S3_ENDPOINT: ${MEDIA_S3_ENDPOINT:-https://s3.menlo.ai}
       MEDIA_S3_PUBLIC_ENDPOINT: ${MEDIA_S3_PUBLIC_ENDPOINT:-}
@@ -118,16 +114,16 @@ services:
       MEDIA_S3_SECRET_ACCESS_KEY: ${MEDIA_S3_SECRET_ACCESS_KEY:-YYYY}
       MEDIA_S3_USE_PATH_STYLE: ${MEDIA_S3_USE_PATH_STYLE:-true}
       MEDIA_S3_PRESIGN_TTL: ${MEDIA_S3_PRESIGN_TTL:-168h}
-
+      
       # Media Configuration
       MEDIA_MAX_UPLOAD_BYTES: ${MEDIA_MAX_UPLOAD_BYTES:-20971520}
       MEDIA_PROXY_DOWNLOAD: ${MEDIA_PROXY_DOWNLOAD:-true}
       MEDIA_RETENTION_DAYS: ${MEDIA_RETENTION_DAYS:-30}
       MEDIA_REMOTE_FETCH_TIMEOUT: ${MEDIA_REMOTE_FETCH_TIMEOUT:-15s}
-
+      
       # Logging
       MEDIA_LOG_LEVEL: ${MEDIA_LOG_LEVEL:-info}
-
+      
       # Authentication
       AUTH_ENABLED: "true"
       AUTH_ISSUER: ${ISSUER:-http://localhost:8085/realms/jan}
@@ -160,9 +156,7 @@ services:
     profiles: ["api", "full"]
 
   response-api:
-    build:
-      context: ../..
-      dockerfile: services/response-api/Dockerfile
+    build: ../../services/response-api
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}
