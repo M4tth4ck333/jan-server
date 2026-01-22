@@ -2,7 +2,10 @@
 
 services:
   llm-api:
-    build: ../../services/llm-api
+    build:
+      context: ../../services/llm-api
+      additional_contexts:
+        go-common: ../../packages/go-common
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}
@@ -93,7 +96,10 @@ services:
     profiles: ["api", "full"]
 
   media-api:
-    build: ../../services/media-api
+    build:
+      context: ../../services/media-api
+      additional_contexts:
+        go-common: ../../packages/go-common
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}
@@ -156,7 +162,10 @@ services:
     profiles: ["api", "full"]
 
   response-api:
-    build: ../../services/response-api
+    build:
+      context: ../../services/response-api
+      additional_contexts:
+        go-common: ../../packages/go-common
     restart: unless-stopped
     env_file:
       - ${ENV_FILE:-../../.env}
