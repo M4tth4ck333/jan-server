@@ -24,6 +24,7 @@ jobs:
       context: .
       registry-url: registry.menlo.ai
       tags: registry.menlo.ai/jan-server/web:dev-${{ github.sha }}
+      include-posthog-key: true
       build-args: |
         JAN_BASE_URL=https://api-dev.jan.ai/v1
         JAN_API_BASE_URL=https://api-dev.jan.ai/
@@ -39,5 +40,4 @@ jobs:
         POSTHOG_FLUSH_INTERVAL=10s
         ANALYTICS_PII_LEVEL=hashed
         ANALYTICS_ENVIRONMENT=dev
-        POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY || 'default-key' }}
       is_push: ${{ github.event_name == 'push' }}
