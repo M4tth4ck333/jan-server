@@ -82,8 +82,8 @@ export function DocsPage({
           <Streamdown
             text={content}
             remarkPlugins={[remarkGfm]}
-            rehypePlugins={defaultRehypePlugins()}
-            themes={themes}
+            rehypePlugins={[defaultRehypePlugins.harden]}
+            shikiTheme={themes}
           />
         </div>
       ) : (

@@ -148,8 +148,8 @@ export function MCPToolsManagement() {
 
   const filteredTools = tools.filter(
     (t) =>
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.tool_key.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.tool_key?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 

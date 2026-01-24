@@ -49,7 +49,7 @@ export function CatalogsManagement() {
 
   const filteredCatalogs = catalogs.filter(
     (c) =>
-      c.model_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.model_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.provider?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 

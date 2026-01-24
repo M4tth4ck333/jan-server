@@ -118,8 +118,8 @@ export function ProvidersManagement() {
 
   const filteredProviders = providers.filter(
     (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.type.toLowerCase().includes(searchQuery.toLowerCase())
+      p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.type?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (isLoading) {

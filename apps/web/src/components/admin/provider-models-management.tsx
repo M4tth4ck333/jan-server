@@ -93,7 +93,7 @@ export function ProviderModelsManagement() {
 
   const filteredModels = models.filter(
     (m) =>
-      m.model_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.model_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.provider_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 

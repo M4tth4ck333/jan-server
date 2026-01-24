@@ -186,8 +186,8 @@ export function PromptTemplatesManagement() {
 
   const filteredTemplates = templates.filter(
     (t) =>
-      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.template_key.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.template_key?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
