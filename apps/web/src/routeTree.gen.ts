@@ -10,15 +10,46 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProfileIndexRouteImport } from './routes/profile/index'
+import { Route as DocsIndexRouteImport } from './routes/docs/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ThreadsTemporaryRouteImport } from './routes/threads/temporary'
 import { Route as ThreadsConversationIdRouteImport } from './routes/threads/$conversationId'
 import { Route as ShareSlugRouteImport } from './routes/share/$slug'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
+import { Route as DocsQuickstartRouteImport } from './routes/docs/quickstart'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
+import { Route as AdminPromptTemplatesRouteImport } from './routes/admin/prompt-templates'
+import { Route as AdminMcpToolsRouteImport } from './routes/admin/mcp-tools'
+import { Route as DocsGuidesIndexRouteImport } from './routes/docs/guides/index'
+import { Route as DocsArchitectureIndexRouteImport } from './routes/docs/architecture/index'
+import { Route as DocsApiIndexRouteImport } from './routes/docs/api/index'
+import { Route as AdminModelsIndexRouteImport } from './routes/admin/models/index'
+import { Route as DocsApiChatCompletionsRouteImport } from './routes/docs/api/chat-completions'
+import { Route as DocsApiAuthenticationRouteImport } from './routes/docs/api/authentication'
+import { Route as AdminModelsProvidersRouteImport } from './routes/admin/models/providers'
+import { Route as AdminModelsProviderModelsRouteImport } from './routes/admin/models/provider-models'
+import { Route as AdminModelsCatalogsRouteImport } from './routes/admin/models/catalogs'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileIndexRoute = ProfileIndexRouteImport.update({
+  id: '/profile/',
+  path: '/profile/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ThreadsTemporaryRoute = ThreadsTemporaryRouteImport.update({
@@ -41,71 +72,249 @@ const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   path: '/projects/$projectId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsQuickstartRoute = DocsQuickstartRouteImport.update({
+  id: '/docs/quickstart',
+  path: '/docs/quickstart',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminPromptTemplatesRoute = AdminPromptTemplatesRouteImport.update({
+  id: '/admin/prompt-templates',
+  path: '/admin/prompt-templates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminMcpToolsRoute = AdminMcpToolsRouteImport.update({
+  id: '/admin/mcp-tools',
+  path: '/admin/mcp-tools',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsGuidesIndexRoute = DocsGuidesIndexRouteImport.update({
+  id: '/docs/guides/',
+  path: '/docs/guides/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsArchitectureIndexRoute = DocsArchitectureIndexRouteImport.update({
+  id: '/docs/architecture/',
+  path: '/docs/architecture/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsApiIndexRoute = DocsApiIndexRouteImport.update({
+  id: '/docs/api/',
+  path: '/docs/api/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminModelsIndexRoute = AdminModelsIndexRouteImport.update({
+  id: '/admin/models/',
+  path: '/admin/models/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsApiChatCompletionsRoute = DocsApiChatCompletionsRouteImport.update({
+  id: '/docs/api/chat-completions',
+  path: '/docs/api/chat-completions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsApiAuthenticationRoute = DocsApiAuthenticationRouteImport.update({
+  id: '/docs/api/authentication',
+  path: '/docs/api/authentication',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminModelsProvidersRoute = AdminModelsProvidersRouteImport.update({
+  id: '/admin/models/providers',
+  path: '/admin/models/providers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminModelsProviderModelsRoute =
+  AdminModelsProviderModelsRouteImport.update({
+    id: '/admin/models/provider-models',
+    path: '/admin/models/provider-models',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AdminModelsCatalogsRoute = AdminModelsCatalogsRouteImport.update({
+  id: '/admin/models/catalogs',
+  path: '/admin/models/catalogs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin/mcp-tools': typeof AdminMcpToolsRoute
+  '/admin/prompt-templates': typeof AdminPromptTemplatesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/docs/quickstart': typeof DocsQuickstartRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/share/$slug': typeof ShareSlugRoute
   '/threads/$conversationId': typeof ThreadsConversationIdRoute
   '/threads/temporary': typeof ThreadsTemporaryRoute
+  '/admin/': typeof AdminIndexRoute
+  '/docs/': typeof DocsIndexRoute
+  '/profile/': typeof ProfileIndexRoute
+  '/admin/models/catalogs': typeof AdminModelsCatalogsRoute
+  '/admin/models/provider-models': typeof AdminModelsProviderModelsRoute
+  '/admin/models/providers': typeof AdminModelsProvidersRoute
+  '/docs/api/authentication': typeof DocsApiAuthenticationRoute
+  '/docs/api/chat-completions': typeof DocsApiChatCompletionsRoute
+  '/admin/models/': typeof AdminModelsIndexRoute
+  '/docs/api/': typeof DocsApiIndexRoute
+  '/docs/architecture/': typeof DocsArchitectureIndexRoute
+  '/docs/guides/': typeof DocsGuidesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/mcp-tools': typeof AdminMcpToolsRoute
+  '/admin/prompt-templates': typeof AdminPromptTemplatesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/docs/quickstart': typeof DocsQuickstartRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/share/$slug': typeof ShareSlugRoute
   '/threads/$conversationId': typeof ThreadsConversationIdRoute
   '/threads/temporary': typeof ThreadsTemporaryRoute
+  '/admin': typeof AdminIndexRoute
+  '/docs': typeof DocsIndexRoute
+  '/profile': typeof ProfileIndexRoute
+  '/admin/models/catalogs': typeof AdminModelsCatalogsRoute
+  '/admin/models/provider-models': typeof AdminModelsProviderModelsRoute
+  '/admin/models/providers': typeof AdminModelsProvidersRoute
+  '/docs/api/authentication': typeof DocsApiAuthenticationRoute
+  '/docs/api/chat-completions': typeof DocsApiChatCompletionsRoute
+  '/admin/models': typeof AdminModelsIndexRoute
+  '/docs/api': typeof DocsApiIndexRoute
+  '/docs/architecture': typeof DocsArchitectureIndexRoute
+  '/docs/guides': typeof DocsGuidesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin/mcp-tools': typeof AdminMcpToolsRoute
+  '/admin/prompt-templates': typeof AdminPromptTemplatesRoute
+  '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/docs/quickstart': typeof DocsQuickstartRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/share/$slug': typeof ShareSlugRoute
   '/threads/$conversationId': typeof ThreadsConversationIdRoute
   '/threads/temporary': typeof ThreadsTemporaryRoute
+  '/admin/': typeof AdminIndexRoute
+  '/docs/': typeof DocsIndexRoute
+  '/profile/': typeof ProfileIndexRoute
+  '/admin/models/catalogs': typeof AdminModelsCatalogsRoute
+  '/admin/models/provider-models': typeof AdminModelsProviderModelsRoute
+  '/admin/models/providers': typeof AdminModelsProvidersRoute
+  '/docs/api/authentication': typeof DocsApiAuthenticationRoute
+  '/docs/api/chat-completions': typeof DocsApiChatCompletionsRoute
+  '/admin/models/': typeof AdminModelsIndexRoute
+  '/docs/api/': typeof DocsApiIndexRoute
+  '/docs/architecture/': typeof DocsArchitectureIndexRoute
+  '/docs/guides/': typeof DocsGuidesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin/mcp-tools'
+    | '/admin/prompt-templates'
+    | '/admin/users'
     | '/auth/callback'
+    | '/docs/quickstart'
     | '/projects/$projectId'
     | '/share/$slug'
     | '/threads/$conversationId'
     | '/threads/temporary'
+    | '/admin/'
+    | '/docs/'
+    | '/profile/'
+    | '/admin/models/catalogs'
+    | '/admin/models/provider-models'
+    | '/admin/models/providers'
+    | '/docs/api/authentication'
+    | '/docs/api/chat-completions'
+    | '/admin/models/'
+    | '/docs/api/'
+    | '/docs/architecture/'
+    | '/docs/guides/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin/mcp-tools'
+    | '/admin/prompt-templates'
+    | '/admin/users'
     | '/auth/callback'
+    | '/docs/quickstart'
     | '/projects/$projectId'
     | '/share/$slug'
     | '/threads/$conversationId'
     | '/threads/temporary'
+    | '/admin'
+    | '/docs'
+    | '/profile'
+    | '/admin/models/catalogs'
+    | '/admin/models/provider-models'
+    | '/admin/models/providers'
+    | '/docs/api/authentication'
+    | '/docs/api/chat-completions'
+    | '/admin/models'
+    | '/docs/api'
+    | '/docs/architecture'
+    | '/docs/guides'
   id:
     | '__root__'
     | '/'
+    | '/admin/mcp-tools'
+    | '/admin/prompt-templates'
+    | '/admin/users'
     | '/auth/callback'
+    | '/docs/quickstart'
     | '/projects/$projectId'
     | '/share/$slug'
     | '/threads/$conversationId'
     | '/threads/temporary'
+    | '/admin/'
+    | '/docs/'
+    | '/profile/'
+    | '/admin/models/catalogs'
+    | '/admin/models/provider-models'
+    | '/admin/models/providers'
+    | '/docs/api/authentication'
+    | '/docs/api/chat-completions'
+    | '/admin/models/'
+    | '/docs/api/'
+    | '/docs/architecture/'
+    | '/docs/guides/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminMcpToolsRoute: typeof AdminMcpToolsRoute
+  AdminPromptTemplatesRoute: typeof AdminPromptTemplatesRoute
+  AdminUsersRoute: typeof AdminUsersRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  DocsQuickstartRoute: typeof DocsQuickstartRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
   ShareSlugRoute: typeof ShareSlugRoute
   ThreadsConversationIdRoute: typeof ThreadsConversationIdRoute
   ThreadsTemporaryRoute: typeof ThreadsTemporaryRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  DocsIndexRoute: typeof DocsIndexRoute
+  ProfileIndexRoute: typeof ProfileIndexRoute
+  AdminModelsCatalogsRoute: typeof AdminModelsCatalogsRoute
+  AdminModelsProviderModelsRoute: typeof AdminModelsProviderModelsRoute
+  AdminModelsProvidersRoute: typeof AdminModelsProvidersRoute
+  DocsApiAuthenticationRoute: typeof DocsApiAuthenticationRoute
+  DocsApiChatCompletionsRoute: typeof DocsApiChatCompletionsRoute
+  AdminModelsIndexRoute: typeof AdminModelsIndexRoute
+  DocsApiIndexRoute: typeof DocsApiIndexRoute
+  DocsArchitectureIndexRoute: typeof DocsArchitectureIndexRoute
+  DocsGuidesIndexRoute: typeof DocsGuidesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -115,6 +324,27 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile/': {
+      id: '/profile/'
+      path: '/profile'
+      fullPath: '/profile/'
+      preLoaderRoute: typeof ProfileIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/threads/temporary': {
@@ -145,6 +375,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs/quickstart': {
+      id: '/docs/quickstart'
+      path: '/docs/quickstart'
+      fullPath: '/docs/quickstart'
+      preLoaderRoute: typeof DocsQuickstartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/callback': {
       id: '/auth/callback'
       path: '/auth/callback'
@@ -152,16 +389,116 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/prompt-templates': {
+      id: '/admin/prompt-templates'
+      path: '/admin/prompt-templates'
+      fullPath: '/admin/prompt-templates'
+      preLoaderRoute: typeof AdminPromptTemplatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/mcp-tools': {
+      id: '/admin/mcp-tools'
+      path: '/admin/mcp-tools'
+      fullPath: '/admin/mcp-tools'
+      preLoaderRoute: typeof AdminMcpToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/guides/': {
+      id: '/docs/guides/'
+      path: '/docs/guides'
+      fullPath: '/docs/guides/'
+      preLoaderRoute: typeof DocsGuidesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/architecture/': {
+      id: '/docs/architecture/'
+      path: '/docs/architecture'
+      fullPath: '/docs/architecture/'
+      preLoaderRoute: typeof DocsArchitectureIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/api/': {
+      id: '/docs/api/'
+      path: '/docs/api'
+      fullPath: '/docs/api/'
+      preLoaderRoute: typeof DocsApiIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/models/': {
+      id: '/admin/models/'
+      path: '/admin/models'
+      fullPath: '/admin/models/'
+      preLoaderRoute: typeof AdminModelsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/api/chat-completions': {
+      id: '/docs/api/chat-completions'
+      path: '/docs/api/chat-completions'
+      fullPath: '/docs/api/chat-completions'
+      preLoaderRoute: typeof DocsApiChatCompletionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/api/authentication': {
+      id: '/docs/api/authentication'
+      path: '/docs/api/authentication'
+      fullPath: '/docs/api/authentication'
+      preLoaderRoute: typeof DocsApiAuthenticationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/models/providers': {
+      id: '/admin/models/providers'
+      path: '/admin/models/providers'
+      fullPath: '/admin/models/providers'
+      preLoaderRoute: typeof AdminModelsProvidersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/models/provider-models': {
+      id: '/admin/models/provider-models'
+      path: '/admin/models/provider-models'
+      fullPath: '/admin/models/provider-models'
+      preLoaderRoute: typeof AdminModelsProviderModelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/models/catalogs': {
+      id: '/admin/models/catalogs'
+      path: '/admin/models/catalogs'
+      fullPath: '/admin/models/catalogs'
+      preLoaderRoute: typeof AdminModelsCatalogsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminMcpToolsRoute: AdminMcpToolsRoute,
+  AdminPromptTemplatesRoute: AdminPromptTemplatesRoute,
+  AdminUsersRoute: AdminUsersRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  DocsQuickstartRoute: DocsQuickstartRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
   ShareSlugRoute: ShareSlugRoute,
   ThreadsConversationIdRoute: ThreadsConversationIdRoute,
   ThreadsTemporaryRoute: ThreadsTemporaryRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  DocsIndexRoute: DocsIndexRoute,
+  ProfileIndexRoute: ProfileIndexRoute,
+  AdminModelsCatalogsRoute: AdminModelsCatalogsRoute,
+  AdminModelsProviderModelsRoute: AdminModelsProviderModelsRoute,
+  AdminModelsProvidersRoute: AdminModelsProvidersRoute,
+  DocsApiAuthenticationRoute: DocsApiAuthenticationRoute,
+  DocsApiChatCompletionsRoute: DocsApiChatCompletionsRoute,
+  AdminModelsIndexRoute: AdminModelsIndexRoute,
+  DocsApiIndexRoute: DocsApiIndexRoute,
+  DocsArchitectureIndexRoute: DocsArchitectureIndexRoute,
+  DocsGuidesIndexRoute: DocsGuidesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

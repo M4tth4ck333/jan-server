@@ -1,4 +1,13 @@
-import { ChevronsUpDown, LogOut, SettingsIcon, FlagIcon } from "lucide-react";
+import {
+  ChevronsUpDown,
+  LogOut,
+  SettingsIcon,
+  FlagIcon,
+  User,
+  Shield,
+  BookOpen,
+} from "lucide-react";
+import { useEffect } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@janhq/interfaces/avatar";
 
@@ -8,6 +17,7 @@ import {
   DropDrawerContent,
   DropDrawerItem,
   DropDrawerLabel,
+  DropDrawerSeparator,
   DropDrawerTrigger,
 } from "@janhq/interfaces/dropdrawer";
 import {
@@ -17,7 +27,8 @@ import {
   useSidebar,
 } from "@/components/sidebar/sidebar";
 import { useAuth } from "@/stores/auth-store";
-import { useRouter } from "@tanstack/react-router";
+import { useAdminStore } from "@/stores/admin-store";
+import { useRouter, Link } from "@tanstack/react-router";
 import { getInitialsAvatar } from "@/lib/utils";
 import { URL_PARAM, SETTINGS_SECTION } from "@/constants";
 import { cn } from "@janhq/interfaces/lib";
@@ -27,11 +38,28 @@ export function NavUser() {
   const isGuest = useAuth((state) => state.isGuest);
   const logout = useAuth((state) => state.logout);
   const router = useRouter();
-  const { state } = useSidebar();
+  const { state, setOpenMobile, isMobile } = useSidebar();
+
+  // Admin status
+  const isAdmin = useAdminStore((state) => state.isAdmin);
+  const checkAdminStatus = useAdminStore((state) => state.checkAdminStatus);
+
+  // Check admin status on mount
+  useEffect(() => {
+    if (user && !isGuest) {
+      checkAdminStatus();
+    }
+  }, [user, isGuest, checkAdminStatus]);
 
   if (!user || isGuest) {
     return null;
   }
+
+  const handleNavigation = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   const handleOpenSettings = (section: string = SETTINGS_SECTION.GENERAL) => {
     const url = new URL(window.location.href);
@@ -80,26 +108,47 @@ export function NavUser() {
                 </div>
               </div>
             </DropDrawerLabel>
+            <DropDrawerItem asChild>
+              <Link
+                to="/profile"
+                onClick={handleNavigation}
+                className="flex gap-2 items-center"
+              >
+                <User className="text-muted-foreground" />
+                Profile & API Keys
+              </Link>
+            </DropDrawerItem>
             <DropDrawerItem
               onClick={() => handleOpenSettings(SETTINGS_SECTION.GENERAL)}
             >
               <div className="flex gap-2 items-center justify-center">
                 <SettingsIcon className="text-muted-foreground" />
-                Setting
+                Settings
               </div>
             </DropDrawerItem>
-            {/* <DropDrawerItem>
-                <div className="flex gap-2 items-center justify-center">
-                  <CreditCard className="text-muted-foreground" />
-                  Manage Plan
-                </div>
-              </DropDrawerItem> */}
-            {/* <DropDrawerItem>
-                <div className="flex gap-2 items-center justify-center">
-                  <LifeBuoyIcon className="text-muted-foreground" />
-                  Support
-                </div>
-              </DropDrawerItem> */}
+            <DropDrawerItem asChild>
+              <Link
+                to="/docs"
+                onClick={handleNavigation}
+                className="flex gap-2 items-center"
+              >
+                <BookOpen className="text-muted-foreground" />
+                Documentation
+              </Link>
+            </DropDrawerItem>
+            {isAdmin && (
+              <DropDrawerItem asChild>
+                <Link
+                  to="/admin"
+                  onClick={handleNavigation}
+                  className="flex gap-2 items-center"
+                >
+                  <Shield className="text-muted-foreground" />
+                  Admin Panel
+                </Link>
+              </DropDrawerItem>
+            )}
+            <DropDrawerSeparator />
             <DropDrawerItem asChild>
               <a
                 href={VITE_REPORT_ISSUE_URL}
