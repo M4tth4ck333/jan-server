@@ -41,28 +41,28 @@ var allowedMCPMethods = map[string]bool{
 }
 
 type MCPRoute struct {
-	searchMCP       *SearchMCP
-	providerMCP     *ProviderMCP
-	sandboxMCP      *SandboxFusionMCP
-	memoryMCP       *MemoryMCP
-	imageMCP        *ImageGenerateMCP
-	imageEditMCP    *ImageEditMCP
-	aioMCP          *AIOMCP
-	agentProxyMCP   *AgentProxyMCP
-	llmClient       *llmapi.Client    // LLM-API client for tool call tracking
-	toolConfigCache *toolconfig.Cache // Cache for dynamic tool descriptions
-	mcpServer       *mcp.Server
-	httpHandler     http.Handler
+	searchMCP         *SearchMCP
+	providerMCP       *ProviderMCP
+	sandboxFusionMCP  *SandboxFusionMCP
+	memoryMCP         *MemoryMCP
+	imageMCP          *ImageGenerateMCP
+	imageEditMCP      *ImageEditMCP
+	sandboxMCP        *SandboxMCP // Unified sandbox provider (AIO or E2B)
+	agentProxyMCP     *AgentProxyMCP
+	llmClient         *llmapi.Client    // LLM-API client for tool call tracking
+	toolConfigCache   *toolconfig.Cache // Cache for dynamic tool descriptions
+	mcpServer         *mcp.Server
+	httpHandler       http.Handler
 }
 
 func NewMCPRoute(
 	searchMCP *SearchMCP,
 	providerMCP *ProviderMCP,
-	sandboxMCP *SandboxFusionMCP,
+	sandboxFusionMCP *SandboxFusionMCP,
 	memoryMCP *MemoryMCP,
 	imageMCP *ImageGenerateMCP,
 	imageEditMCP *ImageEditMCP,
-	aioMCP *AIOMCP,
+	sandboxMCP *SandboxMCP,
 	agentProxyMCP *AgentProxyMCP,
 	llmClient *llmapi.Client,
 	toolConfigCache *toolconfig.Cache,
@@ -76,8 +76,8 @@ func NewMCPRoute(
 	// Pass LLM client to tool handlers for tracking
 	searchMCP.SetLLMClient(llmClient)
 
-	if sandboxMCP != nil {
-		sandboxMCP.SetLLMClient(llmClient)
+	if sandboxFusionMCP != nil {
+		sandboxFusionMCP.SetLLMClient(llmClient)
 	}
 
 	// Register memory tools
@@ -93,8 +93,8 @@ func NewMCPRoute(
 		imageEditMCP.RegisterTools(server)
 	}
 
-	if sandboxMCP != nil {
-		sandboxMCP.RegisterTools(server)
+	if sandboxFusionMCP != nil {
+		sandboxFusionMCP.RegisterTools(server)
 	}
 
 	// Register memory tools
@@ -102,9 +102,10 @@ func NewMCPRoute(
 		memoryMCP.RegisterTools(server)
 	}
 
-	// Register AIO Sandbox tools
-	if aioMCP != nil {
-		aioMCP.RegisterTools(server)
+	// Register unified sandbox tools (AIO or E2B provider)
+	if sandboxMCP != nil {
+		sandboxMCP.SetLLMClient(llmClient)
+		sandboxMCP.RegisterTools(server)
 	}
 
 	// Register unified run_agent tool for agent execution
@@ -122,17 +123,17 @@ func NewMCPRoute(
 	}
 
 	return &MCPRoute{
-		searchMCP:       searchMCP,
-		providerMCP:     providerMCP,
-		sandboxMCP:      sandboxMCP,
-		memoryMCP:       memoryMCP,
-		imageMCP:        imageMCP,
-		imageEditMCP:    imageEditMCP,
-		aioMCP:          aioMCP,
-		agentProxyMCP:   agentProxyMCP,
-		llmClient:       llmClient,
-		toolConfigCache: toolConfigCache,
-		mcpServer:       server,
+		searchMCP:        searchMCP,
+		providerMCP:      providerMCP,
+		sandboxFusionMCP: sandboxFusionMCP,
+		memoryMCP:        memoryMCP,
+		imageMCP:         imageMCP,
+		imageEditMCP:     imageEditMCP,
+		sandboxMCP:       sandboxMCP,
+		agentProxyMCP:    agentProxyMCP,
+		llmClient:        llmClient,
+		toolConfigCache:  toolConfigCache,
+		mcpServer:        server,
 		httpHandler: mcp.NewStreamableHTTPHandler(func(_ *http.Request) *mcp.Server {
 			return server
 		}, &mcp.StreamableHTTPOptions{
@@ -273,19 +274,6 @@ func (route *MCPRoute) handleToolsListWithDynamicDescriptions(reqCtx *gin.Contex
 		reqCtx.Writer.Write(responseBody)
 		return
 	}
-
-	filteredTools := make([]struct {
-		Name        string                 `json:"name"`
-		Description string                 `json:"description"`
-		InputSchema map[string]interface{} `json:"inputSchema,omitempty"`
-	}, 0, len(rpcResponse.Result.Tools))
-	for _, tool := range rpcResponse.Result.Tools {
-		if strings.HasPrefix(tool.Name, "aio_") {
-			continue
-		}
-		filteredTools = append(filteredTools, tool)
-	}
-	rpcResponse.Result.Tools = filteredTools
 
 	// Override descriptions from cache
 	for i := range rpcResponse.Result.Tools {

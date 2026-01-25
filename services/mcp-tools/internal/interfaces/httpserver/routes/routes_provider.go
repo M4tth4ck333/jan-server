@@ -4,8 +4,10 @@ import (
 	"github.com/google/wire"
 	"github.com/rs/zerolog/log"
 
+	sandboxdomain "jan-server/services/mcp-tools/internal/domain/sandbox"
 	"jan-server/services/mcp-tools/internal/infrastructure/aio"
 	"jan-server/services/mcp-tools/internal/infrastructure/config"
+	"jan-server/services/mcp-tools/internal/infrastructure/e2b"
 	"jan-server/services/mcp-tools/internal/infrastructure/llmapi"
 	sandboxfusionclient "jan-server/services/mcp-tools/internal/infrastructure/sandboxfusion"
 	"jan-server/services/mcp-tools/internal/infrastructure/toolconfig"
@@ -20,7 +22,7 @@ var RoutesProvider = wire.NewSet(
 	ProvideMemoryMCP,
 	ProvideImageGenerateMCP,
 	ProvideImageEditMCP,
-	ProvideAIOMCP,
+	ProvideSandboxMCP,
 	ProvideAgentProxyMCP,
 	ProvideToolConfigCache,
 	ProvideMCPRoute,
@@ -100,26 +102,57 @@ func ProvideToolConfigCache(cfg *config.Config, llmClient *llmapi.Client) *toolc
 	return toolconfig.NewCache(llmClient)
 }
 
-// ProvideAIOMCP creates an AIOMCP handler if configured
-func ProvideAIOMCP(cfg *config.Config) *mcp.AIOMCP {
-	if !cfg.AIOEnabled {
-		log.Info().Msg("AIO Sandbox integration disabled (AIO_ENABLED=false)")
+// ProvideSandboxMCP creates a SandboxMCP handler with the appropriate provider
+func ProvideSandboxMCP(cfg *config.Config) *mcp.SandboxMCP {
+	var sandboxProvider sandboxdomain.Provider
+
+	switch cfg.SandboxProvider {
+	case "aio":
+		aioClient := aio.NewClient(aio.ClientConfig{
+			BaseURL: cfg.AIOURL,
+			Timeout: cfg.AIOTimeout,
+			Enabled: true,
+		})
+		if aioClient.IsEnabled() {
+			sandboxProvider = aioClient
+			log.Info().
+				Str("provider", "aio").
+				Str("url", cfg.AIOURL).
+				Dur("timeout", cfg.AIOTimeout).
+				Msg("Sandbox provider initialized")
+		} else {
+			log.Warn().Msg("SANDBOX_PROVIDER=aio but client failed to initialize")
+			return nil
+		}
+
+	case "e2b":
+		e2bClient := e2b.NewClient(e2b.ClientConfig{
+			BaseURL: cfg.E2BServiceURL,
+			Timeout: cfg.E2BTimeout,
+			Enabled: true,
+		})
+		if e2bClient.IsEnabled() {
+			sandboxProvider = e2bClient
+			log.Info().
+				Str("provider", "e2b").
+				Str("url", cfg.E2BServiceURL).
+				Dur("timeout", cfg.E2BTimeout).
+				Msg("Sandbox provider initialized")
+		} else {
+			log.Warn().Msg("SANDBOX_PROVIDER=e2b but client failed to initialize")
+			return nil
+		}
+
+	case "":
+		log.Info().Msg("Sandbox provider disabled (SANDBOX_PROVIDER not set)")
+		return nil
+
+	default:
+		log.Warn().Str("provider", cfg.SandboxProvider).Msg("Unknown sandbox provider")
 		return nil
 	}
-	aioClient := aio.NewClient(aio.ClientConfig{
-		BaseURL: cfg.AIOURL,
-		Timeout: cfg.AIOTimeout,
-		Enabled: cfg.AIOEnabled,
-	})
-	if !aioClient.IsEnabled() {
-		log.Warn().Msg("AIO_ENABLED=true but client failed to initialize")
-		return nil
-	}
-	log.Info().
-		Str("aio_url", cfg.AIOURL).
-		Dur("aio_timeout", cfg.AIOTimeout).
-		Msg("AIO Sandbox integration enabled")
-	return mcp.NewAIOMCP(aioClient, true)
+
+	return mcp.NewSandboxMCP(sandboxProvider)
 }
 
 // ProvideAgentProxyMCP creates an AgentProxyMCP with dependencies
@@ -144,11 +177,11 @@ func ProvideAgentProxyMCP(cfg *config.Config) *mcp.AgentProxyMCP {
 func ProvideMCPRoute(
 	searchMCP *mcp.SearchMCP,
 	providerMCP *mcp.ProviderMCP,
-	sandboxMCP *mcp.SandboxFusionMCP,
+	sandboxFusionMCP *mcp.SandboxFusionMCP,
 	memoryMCP *mcp.MemoryMCP,
 	imageMCP *mcp.ImageGenerateMCP,
 	imageEditMCP *mcp.ImageEditMCP,
-	aioMCP *mcp.AIOMCP,
+	sandboxMCP *mcp.SandboxMCP,
 	agentProxyMCP *mcp.AgentProxyMCP,
 	llmClient *llmapi.Client,
 	toolConfigCache *toolconfig.Cache,
@@ -157,5 +190,5 @@ func ProvideMCPRoute(
 	if toolConfigCache != nil {
 		searchMCP.SetToolConfigCache(toolConfigCache)
 	}
-	return mcp.NewMCPRoute(searchMCP, providerMCP, sandboxMCP, memoryMCP, imageMCP, imageEditMCP, aioMCP, agentProxyMCP, llmClient, toolConfigCache)
+	return mcp.NewMCPRoute(searchMCP, providerMCP, sandboxFusionMCP, memoryMCP, imageMCP, imageEditMCP, sandboxMCP, agentProxyMCP, llmClient, toolConfigCache)
 }

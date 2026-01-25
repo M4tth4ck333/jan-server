@@ -1454,7 +1454,7 @@ func (s *ServiceImpl) readSandboxFile(ctx context.Context, resp *Response, path 
 
 	readFile := func(target string) (*tool.Result, error) {
 		return s.mcpClient.CallTool(ctx, tool.CallRequest{
-			Name: "aio_file_read",
+			Name: "sandbox_file_read",
 			Arguments: map[string]interface{}{
 				"path": target,
 			},

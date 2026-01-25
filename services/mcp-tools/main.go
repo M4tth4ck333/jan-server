@@ -10,10 +10,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 
+	sandboxdomain "jan-server/services/mcp-tools/internal/domain/sandbox"
 	domainsearch "jan-server/services/mcp-tools/internal/domain/search"
 	"jan-server/services/mcp-tools/internal/infrastructure/aio"
 	"jan-server/services/mcp-tools/internal/infrastructure/auth"
 	"jan-server/services/mcp-tools/internal/infrastructure/config"
+	"jan-server/services/mcp-tools/internal/infrastructure/e2b"
 	"jan-server/services/mcp-tools/internal/infrastructure/llmapi"
 	"jan-server/services/mcp-tools/internal/infrastructure/logger"
 	"jan-server/services/mcp-tools/internal/infrastructure/mcpprovider"
@@ -197,25 +199,54 @@ func main() {
 		searchMCP.SetToolConfigCache(toolConfigCache)
 	}
 
-	// Initialize AIO Sandbox client and MCP handler
-	var aioMCP *mcp.AIOMCP
-	if cfg.AIOEnabled {
+	// Initialize sandbox provider (mutually exclusive: AIO or E2B)
+	var sandboxProvider sandboxdomain.Provider
+	var unifiedSandboxMCP *mcp.SandboxMCP
+
+	switch cfg.SandboxProvider {
+	case "aio":
 		aioClient := aio.NewClient(aio.ClientConfig{
 			BaseURL: cfg.AIOURL,
 			Timeout: cfg.AIOTimeout,
-			Enabled: cfg.AIOEnabled,
+			Enabled: true,
 		})
 		if aioClient.IsEnabled() {
-			aioMCP = mcp.NewAIOMCP(aioClient, true)
+			sandboxProvider = aioClient
 			log.Info().
-				Str("aio_url", cfg.AIOURL).
-				Dur("aio_timeout", cfg.AIOTimeout).
-				Msg("AIO Sandbox integration enabled")
+				Str("provider", "aio").
+				Str("url", cfg.AIOURL).
+				Dur("timeout", cfg.AIOTimeout).
+				Msg("Sandbox provider initialized")
 		} else {
-			log.Warn().Msg("AIO_ENABLED=true but client failed to initialize")
+			log.Warn().Msg("SANDBOX_PROVIDER=aio but client failed to initialize")
 		}
-	} else {
-		log.Info().Msg("AIO Sandbox integration disabled (AIO_ENABLED=false)")
+
+	case "e2b":
+		e2bClient := e2b.NewClient(e2b.ClientConfig{
+			BaseURL: cfg.E2BServiceURL,
+			Timeout: cfg.E2BTimeout,
+			Enabled: true,
+		})
+		if e2bClient.IsEnabled() {
+			sandboxProvider = e2bClient
+			log.Info().
+				Str("provider", "e2b").
+				Str("url", cfg.E2BServiceURL).
+				Dur("timeout", cfg.E2BTimeout).
+				Msg("Sandbox provider initialized")
+		} else {
+			log.Warn().Msg("SANDBOX_PROVIDER=e2b but client failed to initialize")
+		}
+
+	case "":
+		log.Info().Msg("Sandbox provider disabled (SANDBOX_PROVIDER not set)")
+
+	default:
+		log.Warn().Str("provider", cfg.SandboxProvider).Msg("Unknown sandbox provider")
+	}
+
+	if sandboxProvider != nil {
+		unifiedSandboxMCP = mcp.NewSandboxMCP(sandboxProvider)
 	}
 
 	// Initialize Agent Proxy MCP handler
@@ -234,7 +265,7 @@ func main() {
 		log.Info().Msg("Agent proxy integration disabled (MCP_AGENT_PROXY_ENABLED=false)")
 	}
 
-	mcpRoute := mcp.NewMCPRoute(searchMCP, providerMCP, sandboxMCP, memoryMCP, imageMCP, imageEditMCP, aioMCP, agentProxyMCP, llmClient, toolConfigCache)
+	mcpRoute := mcp.NewMCPRoute(searchMCP, providerMCP, sandboxMCP, memoryMCP, imageMCP, imageEditMCP, unifiedSandboxMCP, agentProxyMCP, llmClient, toolConfigCache)
 
 	authValidator, err := auth.NewValidator(ctx, cfg, log.Logger)
 	if err != nil {
