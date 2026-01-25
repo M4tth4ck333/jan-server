@@ -56,6 +56,7 @@ interface ProviderFormData {
   category: string;
   base_url: string;
   endpoints: string;
+  image_edit_path: string;
   api_key: string;
   description: string;
   active: boolean;
@@ -66,10 +67,11 @@ interface ProviderFormData {
 
 const defaultFormData: ProviderFormData = {
   name: "",
-  vendor: "openai",
+  vendor: "",
   category: "llm",
   base_url: "",
   endpoints: "",
+  image_edit_path: "",
   api_key: "",
   description: "",
   active: true,
@@ -217,8 +219,16 @@ export function ProvidersManagement() {
       if (formData.api_key) {
         createData.api_key = formData.api_key;
       }
+      // Build metadata object with optional fields
+      const metadata: Record<string, string> = {};
       if (formData.description) {
-        createData.metadata = { description: formData.description };
+        metadata.description = formData.description;
+      }
+      if (formData.image_edit_path) {
+        metadata.image_edit_path = formData.image_edit_path;
+      }
+      if (Object.keys(metadata).length > 0) {
+        createData.metadata = metadata;
       }
 
       await providerManagementService.createProvider(createData as Parameters<typeof providerManagementService.createProvider>[0]);
@@ -276,6 +286,17 @@ export function ProvidersManagement() {
       if (formData.api_key) {
         updateData.api_key = formData.api_key;
       }
+      // Build metadata object with optional fields
+      const metadata: Record<string, string> = {};
+      if (formData.description) {
+        metadata.description = formData.description;
+      }
+      if (formData.image_edit_path) {
+        metadata.image_edit_path = formData.image_edit_path;
+      }
+      if (Object.keys(metadata).length > 0) {
+        updateData.metadata = metadata;
+      }
 
       await providerManagementService.updateProvider(
         providerToEdit.id,
@@ -299,6 +320,7 @@ export function ProvidersManagement() {
 
   function openEditDialog(provider: Provider) {
     setProviderToEdit(provider);
+    const metadata = provider.metadata as Record<string, string> | undefined;
     setFormData({
       name: provider.name,
       vendor: provider.vendor,
@@ -307,8 +329,9 @@ export function ProvidersManagement() {
       endpoints: provider.endpoints
         ? provider.endpoints.map((e) => e.url).join(", ")
         : "",
+      image_edit_path: metadata?.image_edit_path || "",
       api_key: "",
-      description: (provider.metadata as Record<string, string>)?.description || "",
+      description: metadata?.description || "",
       active: provider.active,
       default_provider_image_generate: provider.default_provider_image_generate || false,
       default_provider_image_edit: provider.default_provider_image_edit || false,
@@ -625,76 +648,88 @@ export function ProvidersManagement() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Name *</label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="My Provider"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Vendor *</label>
-                <select
-                  value={formData.vendor}
-                  onChange={(e) =>
-                    setFormData({ ...formData, vendor: e.target.value })
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {PROVIDER_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Category</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({ ...formData, category: e.target.value })
-                  }
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium">Base URL</label>
-                <Input
-                  value={formData.base_url}
-                  onChange={(e) =>
-                    setFormData({ ...formData, base_url: e.target.value })
-                  }
-                  placeholder="https://api.openai.com/v1"
-                />
-              </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Provider Name</label>
+              <Input
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                placeholder="vLLM Provider"
+              />
             </div>
 
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Endpoints</label>
-              <textarea
+              <label className="text-sm font-medium">Vendor</label>
+              <Input
+                value={formData.vendor}
+                onChange={(e) =>
+                  setFormData({ ...formData, vendor: e.target.value })
+                }
+                placeholder="jan"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Category</label>
+              <select
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Base URL</label>
+              <Input
+                value={formData.base_url}
+                onChange={(e) =>
+                  setFormData({ ...formData, base_url: e.target.value })
+                }
+                placeholder="https://inference.jan.ai/v1"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional when endpoints are provided.
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">
+                Endpoints (comma-separated or JSON array)
+              </label>
+              <Input
                 value={formData.endpoints}
                 onChange={(e) =>
                   setFormData({ ...formData, endpoints: e.target.value })
                 }
-                placeholder="Comma-separated URLs or JSON array"
-                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder={formData.base_url || "https://api.example.com/v1"}
               />
               <p className="text-xs text-muted-foreground">
-                Enter comma-separated URLs or a JSON array of endpoint objects
+                Leave blank to keep existing endpoints or use Base URL fallback.
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">
+                Image Edit Path (Optional)
+              </label>
+              <Input
+                value={formData.image_edit_path}
+                onChange={(e) =>
+                  setFormData({ ...formData, image_edit_path: e.target.value })
+                }
+                placeholder="/v1/images/edits or full URL"
+              />
+              <p className="text-xs text-muted-foreground">
+                Overrides the edit endpoint for this provider.
               </p>
             </div>
 
@@ -723,57 +758,82 @@ export function ProvidersManagement() {
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="active"
-                  checked={formData.active}
-                  onChange={(e) =>
-                    setFormData({ ...formData, active: e.target.checked })
-                  }
-                  className="rounded"
-                />
-                <label htmlFor="active" className="text-sm">
-                  Active
-                </label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="active"
+                    checked={formData.active}
+                    onChange={(e) =>
+                      setFormData({ ...formData, active: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="active" className="text-sm">
+                    Active
+                  </label>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Enable this provider
+                </span>
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="default_image_gen"
-                  checked={formData.default_provider_image_generate}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      default_provider_image_generate: e.target.checked,
-                    })
-                  }
-                  className="rounded"
-                />
-                <label htmlFor="default_image_gen" className="text-sm">
-                  Default for Image Generation
-                </label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="default_image_gen"
+                    checked={formData.default_provider_image_generate}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        default_provider_image_generate: e.target.checked,
+                      })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="default_image_gen" className="text-sm">
+                    Default for Image Generate
+                  </label>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Use as default for /v1/images/generations
+                </span>
               </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="default_image_edit"
-                  checked={formData.default_provider_image_edit}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      default_provider_image_edit: e.target.checked,
-                    })
-                  }
-                  className="rounded"
-                />
-                <label htmlFor="default_image_edit" className="text-sm">
-                  Default for Image Editing
-                </label>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="default_image_edit"
+                    checked={formData.default_provider_image_edit}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        default_provider_image_edit: e.target.checked,
+                      })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="default_image_edit" className="text-sm">
+                    Default for Image Edit
+                  </label>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  Use as default for /v1/images/edits
+                </span>
               </div>
             </div>
+
+            {/* Provider ID (read-only, only shown when editing) */}
+            {editDialogOpen && providerToEdit && (
+              <div className="pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium">Provider ID:</span>{" "}
+                  <span className="font-mono">{providerToEdit.id}</span>
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <DialogClose asChild>
@@ -786,7 +846,7 @@ export function ProvidersManagement() {
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
-              {editDialogOpen ? "Update" : "Add Provider"}
+              {editDialogOpen ? "Save Changes" : "Add Provider"}
             </Button>
           </DialogFooter>
         </DialogContent>
