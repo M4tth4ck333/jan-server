@@ -3,7 +3,6 @@ import { Link, useLocation } from "@tanstack/react-router";
 import {
   Book,
   ChevronRight,
-  FileText,
   Menu,
   X,
   Home,
@@ -11,12 +10,10 @@ import {
   Settings,
   PlayCircle,
   Server,
-  Shield,
-  Wrench,
 } from "lucide-react";
 import { Button } from "@janhq/interfaces/button";
 import { cn } from "@/lib/utils";
-import { SidebarTrigger, useSidebar } from "@/components/sidebar/sidebar";
+import { SidebarTrigger } from "@/components/sidebar/sidebar";
 
 interface NavItem {
   title: string;
@@ -94,8 +91,6 @@ export function DocsLayout({ children }: DocsLayoutProps) {
     "Getting Started",
     "API Reference",
   ]);
-  const { state: sidebarState } = useSidebar();
-  const isSidebarCollapsed = sidebarState === "collapsed";
 
   const toggleSection = (title: string) => {
     setExpandedSections((prev) =>
@@ -163,7 +158,7 @@ export function DocsLayout({ children }: DocsLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen w-full bg-background overflow-hidden">
       {/* Mobile nav toggle */}
       <div className="fixed top-4 left-4 z-50 md:hidden">
         <Button
@@ -178,9 +173,8 @@ export function DocsLayout({ children }: DocsLayoutProps) {
       {/* Docs sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 z-40 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0",
-          mobileNavOpen ? "translate-x-0" : "-translate-x-full",
-          isSidebarCollapsed ? "md:ml-0" : "md:ml-0"
+          "fixed inset-y-0 left-0 z-40 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out md:relative md:translate-x-0 flex-shrink-0",
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="flex flex-col h-full">
@@ -219,9 +213,9 @@ export function DocsLayout({ children }: DocsLayoutProps) {
         />
       )}
 
-      {/* Main content */}
-      <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
-        <div className="w-full px-6 py-8 md:py-12 md:px-12">
+      {/* Main content - fills remaining space */}
+      <main className="flex-1 min-w-0 h-full overflow-y-auto bg-background">
+        <div className="h-full w-full max-w-4xl mx-auto px-6 py-8 md:py-12 md:px-8">
           {children}
         </div>
       </main>
