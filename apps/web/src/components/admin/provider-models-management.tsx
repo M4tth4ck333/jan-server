@@ -661,7 +661,7 @@ export function ProviderModelsManagement() {
         </div>
       )}
 
-      {/* Edit Model Dialog */}
+      {/* Edit Provider Model Dialog */}
       <Dialog
         open={editDialogOpen}
         onOpenChange={(open) => {
@@ -672,299 +672,217 @@ export function ProviderModelsManagement() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Model</DialogTitle>
-            <DialogDescription>
-              Update the model configuration for{" "}
-              <code className="bg-muted px-1.5 py-0.5 rounded">
-                {modelToEdit?.model_public_id}
-              </code>
-            </DialogDescription>
+            <DialogTitle>Edit Provider Model</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-6 py-4">
-            {/* Basic Info */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                Basic Information
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Display Name</label>
-                  <Input
-                    value={formData.model_display_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, model_display_name: e.target.value })
-                    }
-                    placeholder="Model Display Name"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) =>
-                      setFormData({ ...formData, category: e.target.value })
-                    }
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    {CATEGORIES.map((cat) => (
-                      <option key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Display Name</label>
+              <Input
+                value={formData.model_display_name}
+                onChange={(e) =>
+                  setFormData({ ...formData, model_display_name: e.target.value })
+                }
+                placeholder="Model Display Name"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Category</label>
+              <Input
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
+                list="category-options"
+                placeholder="Select or type custom category"
+              />
+              <datalist id="category-options">
+                {CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value} />
+                ))}
+              </datalist>
+              <p className="text-xs text-muted-foreground">
+                Select from predefined options or type a custom category
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Category Order Number</label>
+                <Input
+                  type="number"
+                  value={formData.category_order_number ?? ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      category_order_number: e.target.value ? parseInt(e.target.value) : undefined,
+                    })
+                  }
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sort order for the category
+                </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Category Order</label>
-                  <Input
-                    type="number"
-                    value={formData.category_order_number ?? ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        category_order_number: e.target.value ? parseInt(e.target.value) : undefined,
-                      })
-                    }
-                    placeholder="Sort order within category"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Model Order</label>
-                  <Input
-                    type="number"
-                    value={formData.model_order_number ?? ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        model_order_number: e.target.value ? parseInt(e.target.value) : undefined,
-                      })
-                    }
-                    placeholder="Sort order within models"
-                  />
-                </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Model Order Number</label>
+                <Input
+                  type="number"
+                  value={formData.model_order_number ?? ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      model_order_number: e.target.value ? parseInt(e.target.value) : undefined,
+                    })
+                  }
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Sort order within the category
+                </p>
               </div>
             </div>
 
-            {/* Pricing */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                Pricing (per 1M tokens)
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Prompt Price ($)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.pricing_prompt ?? ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        pricing_prompt: e.target.value ? parseFloat(e.target.value) : undefined,
-                      })
-                    }
-                    placeholder="e.g., 3.00"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Completion Price ($)</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.pricing_completion ?? ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        pricing_completion: e.target.value ? parseFloat(e.target.value) : undefined,
-                      })
-                    }
-                    placeholder="e.g., 15.00"
-                  />
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Prompt Price</label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  value={formData.pricing_prompt ?? ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      pricing_prompt: e.target.value ? parseFloat(e.target.value) : undefined,
+                    })
+                  }
+                  placeholder=""
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Completion Price</label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  value={formData.pricing_completion ?? ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      pricing_completion: e.target.value ? parseFloat(e.target.value) : undefined,
+                    })
+                  }
+                  placeholder=""
+                />
               </div>
             </div>
 
-            {/* Token Limits */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                Token Limits
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Context Length</label>
-                  <Input
-                    type="number"
-                    value={formData.context_length ?? ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        context_length: e.target.value ? parseInt(e.target.value) : undefined,
-                      })
-                    }
-                    placeholder="e.g., 128000"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Max Completion Tokens</label>
-                  <Input
-                    type="number"
-                    value={formData.max_completion_tokens ?? ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        max_completion_tokens: e.target.value ? parseInt(e.target.value) : undefined,
-                      })
-                    }
-                    placeholder="e.g., 4096"
-                  />
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Context Length</label>
+                <Input
+                  type="number"
+                  value={formData.context_length ?? ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      context_length: e.target.value ? parseInt(e.target.value) : undefined,
+                    })
+                  }
+                  placeholder=""
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Max Output Tokens</label>
+                <Input
+                  type="number"
+                  value={formData.max_completion_tokens ?? ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      max_completion_tokens: e.target.value ? parseInt(e.target.value) : undefined,
+                    })
+                  }
+                  placeholder=""
+                />
               </div>
             </div>
 
-            {/* Capabilities */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                Capabilities
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="flex items-center gap-2">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Capabilities</label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    id="supports_images"
                     checked={formData.supports_images}
                     onChange={(e) =>
                       setFormData({ ...formData, supports_images: e.target.checked })
                     }
                     className="rounded"
                   />
-                  <label htmlFor="supports_images" className="text-sm">
-                    Vision
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
+                  <span className="text-sm">Vision</span>
+                </label>
+                <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    id="supports_audio"
                     checked={formData.supports_audio}
                     onChange={(e) =>
                       setFormData({ ...formData, supports_audio: e.target.checked })
                     }
                     className="rounded"
                   />
-                  <label htmlFor="supports_audio" className="text-sm">
-                    Audio
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
+                  <span className="text-sm">Audio</span>
+                </label>
+                <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    id="supports_video"
                     checked={formData.supports_video}
                     onChange={(e) =>
                       setFormData({ ...formData, supports_video: e.target.checked })
                     }
                     className="rounded"
                   />
-                  <label htmlFor="supports_video" className="text-sm">
-                    Video
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
+                  <span className="text-sm">Video</span>
+                </label>
+                <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    id="supports_reasoning"
                     checked={formData.supports_reasoning}
                     onChange={(e) =>
                       setFormData({ ...formData, supports_reasoning: e.target.checked })
                     }
                     className="rounded"
                   />
-                  <label htmlFor="supports_reasoning" className="text-sm">
-                    Reasoning
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
+                  <span className="text-sm">Reasoning</span>
+                </label>
+                <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    id="supports_embeddings"
                     checked={formData.supports_embeddings}
                     onChange={(e) =>
                       setFormData({ ...formData, supports_embeddings: e.target.checked })
                     }
                     className="rounded"
                   />
-                  <label htmlFor="supports_embeddings" className="text-sm">
-                    Embeddings
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="supports_tools"
-                    checked={formData.supports_tools}
-                    onChange={(e) =>
-                      setFormData({ ...formData, supports_tools: e.target.checked })
-                    }
-                    className="rounded"
-                  />
-                  <label htmlFor="supports_tools" className="text-sm">
-                    Tools
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="supports_browser"
-                    checked={formData.supports_browser}
-                    onChange={(e) =>
-                      setFormData({ ...formData, supports_browser: e.target.checked })
-                    }
-                    className="rounded"
-                  />
-                  <label htmlFor="supports_browser" className="text-sm">
-                    Browser
-                  </label>
-                </div>
+                  <span className="text-sm">Embeddings</span>
+                </label>
               </div>
             </div>
 
-            {/* Additional */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                Additional Settings
-              </h3>
-              {formData.supports_reasoning && (
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium">Instruct Model Backup</label>
-                  <Input
-                    value={formData.instruct_model_public_id}
-                    onChange={(e) =>
-                      setFormData({ ...formData, instruct_model_public_id: e.target.value })
-                    }
-                    placeholder="model_public_id for fallback"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Fallback model for reasoning mode
-                  </p>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="active"
-                  checked={formData.active}
-                  onChange={(e) =>
-                    setFormData({ ...formData, active: e.target.checked })
-                  }
-                  className="rounded"
-                />
-                <label htmlFor="active" className="text-sm font-medium">
-                  Active
-                </label>
-              </div>
+            <div className="flex items-center gap-2 pt-2">
+              <input
+                type="checkbox"
+                id="active"
+                checked={formData.active}
+                onChange={(e) =>
+                  setFormData({ ...formData, active: e.target.checked })
+                }
+                className="rounded"
+              />
+              <label htmlFor="active" className="text-sm font-medium">
+                Active
+              </label>
             </div>
           </div>
           <DialogFooter>
@@ -975,7 +893,7 @@ export function ProviderModelsManagement() {
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
-              Update Model
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
