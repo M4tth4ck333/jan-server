@@ -1,41 +1,6 @@
-import { useState, useEffect } from "react";
 import { Loader2, AlertCircle, FileText, ExternalLink } from "lucide-react";
 import { Button } from "@janhq/interfaces/button";
-import { Streamdown, defaultRehypePlugins } from "streamdown";
-import remarkGfm from "remark-gfm";
-import type { BundledTheme } from "shiki";
-
-const themes = ["github-light", "github-dark"] as [BundledTheme, BundledTheme];
-
-// Markdown content wrapper with error handling
-function MarkdownContent({ content }: { content: string }) {
-  const [hasError, setHasError] = useState(false);
-
-  useEffect(() => {
-    setHasError(false);
-  }, [content]);
-
-  if (hasError) {
-    // Fallback to simple markdown rendering
-    return (
-      <div className="docs-content prose prose-slate dark:prose-invert">
-        <pre className="whitespace-pre-wrap font-sans text-sm">{content}</pre>
-      </div>
-    );
-  }
-
-  return (
-    <div className="docs-content">
-      <Streamdown
-        text={content}
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[defaultRehypePlugins.harden]}
-        shikiTheme={themes}
-        onError={() => setHasError(true)}
-      />
-    </div>
-  );
-}
+import { Streamdown } from "streamdown";
 
 interface DocsPageProps {
   title: string;
@@ -80,7 +45,7 @@ export function DocsPage({
   }
 
   return (
-    <article className="prose prose-slate dark:prose-invert max-w-none">
+    <article className="w-full">
       {/* Header */}
       <div className="mb-8 pb-6 border-b">
         <div className="flex items-start justify-between gap-4">
@@ -108,7 +73,11 @@ export function DocsPage({
 
       {/* Content */}
       {content && content.trim() ? (
-        <MarkdownContent content={content.trim()} />
+        <div className="docs-content">
+          <Streamdown mode="static">
+            {content.trim()}
+          </Streamdown>
+        </div>
       ) : (
         <div className="text-center py-12 text-muted-foreground">
           <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />

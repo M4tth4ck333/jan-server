@@ -93,8 +93,8 @@ export function ProviderModelsManagement() {
 
   const filteredModels = models.filter(
     (m) =>
-      m.model_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.provider_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      m.model_display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.provider_vendor?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
@@ -237,17 +237,17 @@ export function ProviderModelsManagement() {
                         <Box className="w-4 h-4 text-green-600" />
                       </div>
                       <div>
-                        <div className="font-medium">{model.model_id}</div>
-                        {model.display_name && model.display_name !== model.model_id && (
+                        <div className="font-medium">{model.model_public_id}</div>
+                        {model.model_display_name && model.model_display_name !== model.model_public_id && (
                           <div className="text-sm text-muted-foreground">
-                            {model.display_name}
+                            {model.model_display_name}
                           </div>
                         )}
                       </div>
                     </div>
                   </td>
                   <td className="p-4 text-muted-foreground">
-                    {model.provider_name || "Unknown"}
+                    {model.provider_vendor || "Unknown"}
                   </td>
                   <td className="p-4">
                     <span
@@ -261,8 +261,8 @@ export function ProviderModelsManagement() {
                     </span>
                   </td>
                   <td className="p-4 text-muted-foreground">
-                    {model.context_length
-                      ? `${(model.context_length / 1000).toFixed(0)}K`
+                    {model.token_limits?.context_length
+                      ? `${(model.token_limits.context_length / 1000).toFixed(0)}K`
                       : "-"}
                   </td>
                   <td className="p-4 text-right">

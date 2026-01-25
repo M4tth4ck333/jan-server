@@ -220,8 +220,8 @@ export function DocsLayout({ children }: DocsLayoutProps) {
       )}
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8 md:py-12">
+      <main className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto">
+        <div className="w-full px-6 py-8 md:py-12 md:px-12">
           {children}
         </div>
       </main>

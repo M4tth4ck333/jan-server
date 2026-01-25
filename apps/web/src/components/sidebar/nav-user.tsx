@@ -44,16 +44,15 @@ export function NavUser() {
   const isAdmin = useAdminStore((state) => state.isAdmin);
   const checkAdminStatus = useAdminStore((state) => state.checkAdminStatus);
 
+  // Check if user is logged in (not guest and has user)
+  const isLoggedIn = user && !isGuest;
+
   // Check admin status on mount
   useEffect(() => {
-    if (user && !isGuest) {
+    if (isLoggedIn) {
       checkAdminStatus();
     }
-  }, [user, isGuest, checkAdminStatus]);
-
-  if (!user || isGuest) {
-    return null;
-  }
+  }, [isLoggedIn, checkAdminStatus]);
 
   const handleNavigation = () => {
     if (isMobile) {
@@ -71,22 +70,24 @@ export function NavUser() {
 
   return (
     <SidebarMenu className={cn(isCollapsed && "md:items-center", "gap-1")}>
-      {/* Dashboard Button */}
-      <SidebarMenuItem>
-        <SidebarMenuButton
-          asChild
-          tooltip="Dashboard"
-          className="hover:bg-sidebar-accent"
-        >
-          <Link to="/profile" onClick={handleNavigation}>
-            <LayoutDashboard className="size-4" />
-            <span>Dashboard</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
+      {/* Dashboard Button - Only for logged in users */}
+      {isLoggedIn && (
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            asChild
+            tooltip="Dashboard"
+            className="hover:bg-sidebar-accent"
+          >
+            <Link to="/profile" onClick={handleNavigation}>
+              <LayoutDashboard className="size-4" />
+              <span>Dashboard</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      )}
 
       {/* Administrator Button - Only show for admins */}
-      {isAdmin && (
+      {isLoggedIn && isAdmin && (
         <SidebarMenuItem>
           <SidebarMenuButton
             asChild
@@ -101,7 +102,7 @@ export function NavUser() {
         </SidebarMenuItem>
       )}
 
-      {/* Documentation Button */}
+      {/* Documentation Button - Always visible (public) */}
       <SidebarMenuItem>
         <SidebarMenuButton
           asChild
@@ -115,80 +116,89 @@ export function NavUser() {
         </SidebarMenuButton>
       </SidebarMenuItem>
 
-      {/* User Dropdown */}
+      {/* Report Issue Button - Always visible (public) */}
       <SidebarMenuItem>
-        <DropDrawer>
-          <DropDrawerTrigger asChild>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <Avatar className="h-8 w-8 rounded-full">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="bg-primary text-background font-medium">
-                  {getInitialsAvatar(user.name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.email || user.name}</span>
-              </div>
-              <ChevronsUpDown className="ml-auto size-4" />
-            </SidebarMenuButton>
-          </DropDrawerTrigger>
-          <DropDrawerContent
-            className="md:w-56"
-            side={isCollapsed ? "right" : "top"}
-            align="center"
-            sideOffset={4}
+        <SidebarMenuButton
+          asChild
+          tooltip="Report Issue"
+          className="hover:bg-sidebar-accent"
+        >
+          <a
+            href={VITE_REPORT_ISSUE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            <DropDrawerLabel className="lg:p-0 font-normal">
-              <div className="flex items-center gap-2 px-3 py-1.5 text-left text-sm">
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs text-muted-foreground mt-1">
-                    {user.email}
-                  </span>
-                </div>
-              </div>
-            </DropDrawerLabel>
-            <DropDrawerSeparator />
-            <DropDrawerItem
-              onClick={() => handleOpenSettings(SETTINGS_SECTION.GENERAL)}
-            >
-              <div className="flex gap-2 items-center justify-center">
-                <SettingsIcon className="text-muted-foreground" />
-                Settings
-              </div>
-            </DropDrawerItem>
-            <DropDrawerItem asChild>
-              <a
-                href={VITE_REPORT_ISSUE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex gap-2 items-center"
-              >
-                <FlagIcon className="text-muted-foreground" />
-                Report Issue
-              </a>
-            </DropDrawerItem>
-            <DropDrawerSeparator />
-            <DropDrawerItem
-              onClick={async () => {
-                await logout();
-                router.navigate({
-                  to: "/",
-                  replace: true,
-                });
-              }}
-            >
-              <div className="flex gap-2 items-center justify-center">
-                <LogOut className="text-muted-foreground ml-0.5" />
-                Log out
-              </div>
-            </DropDrawerItem>
-          </DropDrawerContent>
-        </DropDrawer>
+            <FlagIcon className="size-4" />
+            <span>Report Issue</span>
+          </a>
+        </SidebarMenuButton>
       </SidebarMenuItem>
+
+      {/* User Dropdown - Only for logged in users */}
+      {isLoggedIn && user && (
+        <SidebarMenuItem>
+          <DropDrawer>
+            <DropDrawerTrigger asChild>
+              <SidebarMenuButton
+                size="lg"
+                className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              >
+                <Avatar className="h-8 w-8 rounded-full">
+                  <AvatarImage src={user.avatar} alt={user.name} />
+                  <AvatarFallback className="bg-primary text-background font-medium">
+                    {getInitialsAvatar(user.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">{user.email || user.name}</span>
+                </div>
+                <ChevronsUpDown className="ml-auto size-4" />
+              </SidebarMenuButton>
+            </DropDrawerTrigger>
+            <DropDrawerContent
+              className="md:w-56"
+              side={isCollapsed ? "right" : "top"}
+              align="center"
+              sideOffset={4}
+            >
+              <DropDrawerLabel className="lg:p-0 font-normal">
+                <div className="flex items-center gap-2 px-3 py-1.5 text-left text-sm">
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{user.name}</span>
+                    <span className="truncate text-xs text-muted-foreground mt-1">
+                      {user.email}
+                    </span>
+                  </div>
+                </div>
+              </DropDrawerLabel>
+              <DropDrawerSeparator />
+              <DropDrawerItem
+                onClick={() => handleOpenSettings(SETTINGS_SECTION.GENERAL)}
+              >
+                <div className="flex gap-2 items-center justify-center">
+                  <SettingsIcon className="text-muted-foreground" />
+                  Settings
+                </div>
+              </DropDrawerItem>
+              <DropDrawerSeparator />
+              <DropDrawerItem
+                onClick={async () => {
+                  await logout();
+                  router.navigate({
+                    to: "/",
+                    replace: true,
+                  });
+                }}
+              >
+                <div className="flex gap-2 items-center justify-center">
+                  <LogOut className="text-muted-foreground ml-0.5" />
+                  Log out
+                </div>
+              </DropDrawerItem>
+            </DropDrawerContent>
+          </DropDrawer>
+        </SidebarMenuItem>
+      )}
     </SidebarMenu>
   );
 }

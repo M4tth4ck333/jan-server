@@ -68,24 +68,26 @@ interface Endpoint {
 interface ProviderModel {
   id: string;
   provider_id: string;
-  model_display_name: string;
-  model_id: string;
+  provider_vendor: string;
+  model_catalog_id?: string;
   model_public_id: string;
+  provider_original_model_id: string;
+  model_display_name: string;
+  category: string;
+  category_order_number?: number;
+  model_order_number?: number;
   pricing: {
     prompt?: number;
     completion?: number;
     image?: number;
     request?: number;
   };
-  category: string;
-  category_order?: number;
-  model_order?: number;
-  category_order_number?: number;
-  model_order_number?: number;
+  token_limits?: {
+    context_length?: number;
+    max_completion_tokens?: number;
+  };
+  family?: string;
   active: boolean;
-  created_at?: string;
-  updated_at?: string;
-  catalog?: ModelCatalog;
   supports_audio?: boolean;
   supports_embeddings?: boolean;
   supports_images?: boolean;
@@ -94,16 +96,15 @@ interface ProviderModel {
   supports_video?: boolean;
   supports_tools?: boolean;
   supports_browser?: boolean;
-  token_limits?: {
-    context_length?: number;
-    max_completion_tokens?: number;
-  };
   instruct_model_public_id?: string;
+  created_at?: number;
+  updated_at?: number;
 }
 
 // Model Catalog Types
 interface ModelCatalog {
   id: string;
+  public_id: string;
   model_display_name?: string;
   description?: string;
   supported_parameters?: unknown;
@@ -116,6 +117,16 @@ interface ModelCatalog {
         tokenizer?: string;
         instruct_type?: string | null;
       };
+  tags?: string[];
+  notes?: string;
+  context_length?: number;
+  is_moderated?: boolean;
+  active?: boolean;
+  extras?: Record<string, unknown>;
+  status?: string;
+  family?: string;
+  experimental?: boolean;
+  requires_feature_flag?: string | null;
   supports_images?: boolean;
   supports_embeddings?: boolean;
   supports_reasoning?: boolean;
@@ -124,17 +135,9 @@ interface ModelCatalog {
   supports_video?: boolean;
   supports_tools?: boolean;
   supports_browser?: boolean;
-  family?: string;
-  status?: string;
-  is_moderated?: boolean;
-  active?: boolean;
-  experimental?: boolean;
-  requires_feature_flag?: string | null;
-  notes?: string;
-  context_length?: number;
-  tags?: string[];
-  created_at?: string;
-  updated_at?: string;
+  last_synced_at?: number;
+  created_at?: number;
+  updated_at?: number;
 }
 
 // Prompt Template Types

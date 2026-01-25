@@ -119,7 +119,7 @@ export function ProvidersManagement() {
   const filteredProviders = providers.filter(
     (p) =>
       p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.type?.toLowerCase().includes(searchQuery.toLowerCase())
+      p.vendor?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (isLoading) {
@@ -215,7 +215,7 @@ export function ProvidersManagement() {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Type: {provider.type}
+                      Vendor: {provider.vendor}
                     </p>
                     {provider.api_base && (
                       <p className="text-sm text-muted-foreground">

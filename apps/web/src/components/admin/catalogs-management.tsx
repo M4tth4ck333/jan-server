@@ -49,8 +49,8 @@ export function CatalogsManagement() {
 
   const filteredCatalogs = catalogs.filter(
     (c) =>
-      c.model_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.provider?.toLowerCase().includes(searchQuery.toLowerCase())
+      c.model_display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.family?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
@@ -140,9 +140,9 @@ export function CatalogsManagement() {
                     <Layers className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <div className="font-medium">{catalog.model_id}</div>
+                    <div className="font-medium">{catalog.model_display_name || catalog.id}</div>
                     <div className="text-sm text-muted-foreground">
-                      {catalog.provider || "Unknown provider"}
+                      {catalog.family || "Unknown family"}
                     </div>
                   </div>
                 </div>
@@ -211,30 +211,48 @@ export function CatalogsManagement() {
                       Capabilities
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {catalog.supports_vision && (
+                      {catalog.supports_images && (
                         <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400 rounded">
                           Vision
                         </span>
                       )}
-                      {catalog.supports_function_calling && (
+                      {catalog.supports_tools && (
                         <span className="px-2 py-1 text-xs bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 rounded">
-                          Function Calling
+                          Tools
                         </span>
                       )}
-                      {catalog.supports_streaming && (
+                      {catalog.supports_reasoning && (
                         <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded">
-                          Streaming
+                          Reasoning
                         </span>
                       )}
-                      {catalog.supports_json_mode && (
+                      {catalog.supports_audio && (
                         <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400 rounded">
-                          JSON Mode
+                          Audio
                         </span>
                       )}
-                      {!catalog.supports_vision &&
-                        !catalog.supports_function_calling &&
-                        !catalog.supports_streaming &&
-                        !catalog.supports_json_mode && (
+                      {catalog.supports_video && (
+                        <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400 rounded">
+                          Video
+                        </span>
+                      )}
+                      {catalog.supports_embeddings && (
+                        <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-400 rounded">
+                          Embeddings
+                        </span>
+                      )}
+                      {catalog.supports_browser && (
+                        <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400 rounded">
+                          Browser
+                        </span>
+                      )}
+                      {!catalog.supports_images &&
+                        !catalog.supports_tools &&
+                        !catalog.supports_reasoning &&
+                        !catalog.supports_audio &&
+                        !catalog.supports_video &&
+                        !catalog.supports_embeddings &&
+                        !catalog.supports_browser && (
                           <span className="text-sm text-muted-foreground">
                             No special capabilities
                           </span>
