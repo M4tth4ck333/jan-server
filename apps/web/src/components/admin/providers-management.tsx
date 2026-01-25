@@ -180,7 +180,7 @@ export function ProvidersManagement() {
     try {
       setIsSubmitting(true);
 
-      // Parse endpoints
+      // Parse endpoints - supports JSON array, newline-separated, or comma-separated
       let endpoints: Endpoint[] = [];
       if (formData.endpoints.trim()) {
         try {
@@ -192,9 +192,9 @@ export function ProvidersManagement() {
             endpoints = [{ url: formData.endpoints }];
           }
         } catch {
-          // Fallback: comma-separated URLs
+          // Fallback: newline or comma-separated URLs
           endpoints = formData.endpoints
-            .split(",")
+            .split(/[\n,]/)
             .map((url) => url.trim())
             .filter((url) => url)
             .map((url) => ({ url }));
@@ -249,7 +249,7 @@ export function ProvidersManagement() {
     try {
       setIsSubmitting(true);
 
-      // Parse endpoints
+      // Parse endpoints - supports JSON array, newline-separated, or comma-separated
       let endpoints: Endpoint[] | undefined;
       if (formData.endpoints.trim()) {
         try {
@@ -261,7 +261,7 @@ export function ProvidersManagement() {
           }
         } catch {
           endpoints = formData.endpoints
-            .split(",")
+            .split(/[\n,]/)
             .map((url) => url.trim())
             .filter((url) => url)
             .map((url) => ({ url }));
@@ -327,7 +327,7 @@ export function ProvidersManagement() {
       category: provider.category || "llm",
       base_url: provider.base_url || "",
       endpoints: provider.endpoints
-        ? provider.endpoints.map((e) => e.url).join(", ")
+        ? provider.endpoints.map((e) => e.url).join("\n")
         : "",
       image_edit_path: metadata?.image_edit_path || "",
       api_key: "",
@@ -636,7 +636,7 @@ export function ProvidersManagement() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editDialogOpen ? "Edit Provider" : "Add Provider"}
@@ -703,17 +703,19 @@ export function ProvidersManagement() {
 
             <div className="grid gap-2">
               <label className="text-sm font-medium">
-                Endpoints (comma-separated or JSON array)
+                Endpoints (one per line or JSON array)
               </label>
-              <Input
+              <textarea
                 value={formData.endpoints}
                 onChange={(e) =>
                   setFormData({ ...formData, endpoints: e.target.value })
                 }
-                placeholder={formData.base_url || "https://api.example.com/v1"}
+                placeholder={`${formData.base_url || "https://api.example.com/v1"}\nhttps://backup.example.com/v1`}
+                rows={3}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
               />
               <p className="text-xs text-muted-foreground">
-                Leave blank to keep existing endpoints or use Base URL fallback.
+                Enter one endpoint per line, or use comma-separated values. Leave blank to use Base URL fallback.
               </p>
             </div>
 
