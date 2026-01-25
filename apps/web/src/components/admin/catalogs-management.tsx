@@ -15,10 +15,6 @@ import {
   RefreshCw,
   Search,
   Trash2,
-  Info,
-  Settings,
-  Cpu,
-  Sliders,
   X,
 } from "lucide-react";
 import { Button } from "@janhq/interfaces/button";
@@ -42,9 +38,8 @@ import {
   modelCatalogService,
   promptTemplateService,
 } from "@/services/admin-service";
-import { cn } from "@/lib/utils";
 
-type EditTabType = "basic" | "architecture" | "parameters" | "capabilities";
+// Edit tab type removed - now using single scrollable form
 
 // Instruct types from platform
 const INSTRUCT_TYPES = [
@@ -220,7 +215,7 @@ export function CatalogsManagement() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [templatesDialogOpen, setTemplatesDialogOpen] = useState(false);
   const [catalogToEdit, setCatalogToEdit] = useState<ModelCatalog | null>(null);
-  const [activeEditTab, setActiveEditTab] = useState<EditTabType>("basic");
+  // Removed tab state - now using single scrollable form
 
   // Form state
   const [formData, setFormData] = useState<CatalogFormData>(defaultFormData);
@@ -420,7 +415,6 @@ export function CatalogsManagement() {
 
   function resetForm() {
     setFormData(defaultFormData);
-    setActiveEditTab("basic");
   }
 
   function openEditDialog(catalog: ModelCatalog) {
@@ -471,7 +465,6 @@ export function CatalogsManagement() {
       default_repetition_penalty: defaultParamValues.repetition_penalty?.toString() || "",
       default_frequency_penalty: defaultParamValues.frequency_penalty?.toString() || "",
     });
-    setActiveEditTab("basic");
     setEditDialogOpen(true);
   }
 
@@ -519,13 +512,6 @@ export function CatalogsManagement() {
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
   const hasCapabilityFilters = Object.values(capabilityFilters).some(Boolean);
-
-  const editTabs: { id: EditTabType; label: string; icon: React.ElementType }[] = [
-    { id: "basic", label: "Basic", icon: Info },
-    { id: "architecture", label: "Architecture", icon: Cpu },
-    { id: "parameters", label: "Parameters", icon: Sliders },
-    { id: "capabilities", label: "Capabilities", icon: Settings },
-  ];
 
   if (isLoading && catalogs.length === 0) {
     return (
@@ -931,7 +917,7 @@ export function CatalogsManagement() {
         </div>
       )}
 
-      {/* Edit Catalog Dialog with Tabs */}
+      {/* Edit Catalog Dialog - Single scrollable form like platform */}
       <Dialog
         open={editDialogOpen}
         onOpenChange={(open) => {
@@ -942,65 +928,35 @@ export function CatalogsManagement() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Catalog</DialogTitle>
-            <DialogDescription>
-              Update the catalog metadata for{" "}
-              <code className="bg-muted px-1.5 py-0.5 rounded">
-                {catalogToEdit?.public_id}
-              </code>
-            </DialogDescription>
           </DialogHeader>
 
-          {/* Tabs */}
-          <div className="border-b">
-            <nav className="flex space-x-4 px-1" aria-label="Tabs">
-              {editTabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveEditTab(tab.id)}
-                    className={cn(
-                      "flex items-center gap-2 py-2 px-3 text-sm font-medium border-b-2 -mb-px transition-colors",
-                      activeEditTab === tab.id
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50"
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
+          <div className="space-y-6 py-4">
+            {/* Catalog ID (Read-only) */}
+            <div className="bg-muted/30 p-3 rounded-md">
+              <label className="block text-sm font-medium mb-1">Catalog ID (Read-only)</label>
+              <code className="block text-sm text-muted-foreground">{catalogToEdit?.public_id}</code>
+            </div>
 
-          <div className="flex-1 overflow-y-auto py-4">
-            {/* Basic Tab */}
-            {activeEditTab === "basic" && (
+            {/* Basic Information */}
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold mb-3">Basic Information</h3>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Display Name *</label>
-                    <Input
-                      value={formData.model_display_name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, model_display_name: e.target.value })
-                      }
-                      placeholder="e.g., GPT-4 Turbo"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Family</label>
-                    <Input
-                      value={formData.family}
-                      onChange={(e) => setFormData({ ...formData, family: e.target.value })}
-                      placeholder="e.g., gpt-4, claude, gemini"
-                    />
-                  </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">
+                    Model Display Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={formData.model_display_name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, model_display_name: e.target.value })
+                    }
+                    placeholder="e.g., GPT-4 Turbo"
+                  />
                 </div>
+
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Description</label>
                   <textarea
@@ -1013,58 +969,18 @@ export function CatalogsManagement() {
                     className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Status</label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="">Select status</option>
-                      <option value="filled">Filled</option>
-                      <option value="updated">Updated</option>
-                      <option value="pending">Pending</option>
-                      <option value="deprecated">Deprecated</option>
-                    </select>
-                  </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Context Length (tokens)</label>
-                    <Input
-                      type="number"
-                      value={formData.context_length ?? ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          context_length: e.target.value ? parseInt(e.target.value) : undefined,
-                        })
-                      }
-                      placeholder="e.g., 128000"
-                    />
-                  </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Family</label>
+                  <Input
+                    value={formData.family}
+                    onChange={(e) => setFormData({ ...formData, family: e.target.value })}
+                    placeholder="jan"
+                  />
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Requires Feature Flag</label>
-                    <Input
-                      value={formData.requires_feature_flag}
-                      onChange={(e) =>
-                        setFormData({ ...formData, requires_feature_flag: e.target.value })
-                      }
-                      placeholder="feature_flag_key or leave empty"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Tags (comma-separated)</label>
-                    <Input
-                      value={formData.tags}
-                      onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-                      placeholder="vision, reasoning, multimodal"
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-6 pt-2">
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={formData.experimental}
@@ -1073,68 +989,98 @@ export function CatalogsManagement() {
                       }
                       className="rounded"
                     />
-                    <span className="text-sm">Experimental Model</span>
+                    <span className="text-sm font-medium">Experimental Model</span>
                   </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_moderated}
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium">Required Feature Flag</label>
+                    <Input
+                      value={formData.requires_feature_flag}
                       onChange={(e) =>
-                        setFormData({ ...formData, is_moderated: e.target.checked })
+                        setFormData({ ...formData, requires_feature_flag: e.target.value })
                       }
-                      className="rounded"
+                      placeholder="None (Public)"
                     />
-                    <span className="text-sm">Is Moderated</span>
-                  </label>
+                  </div>
                 </div>
-                <div className="grid gap-2 pt-2">
-                  <label className="text-sm font-medium">Notes</label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Add any notes about this catalog..."
-                    rows={3}
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Select status</option>
+                    <option value="filled">Filled</option>
+                    <option value="updated">Updated</option>
+                    <option value="pending">Pending</option>
+                    <option value="deprecated">Deprecated</option>
+                  </select>
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Context Length (tokens)</label>
+                  <Input
+                    type="number"
+                    value={formData.context_length ?? ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        context_length: e.target.value ? parseInt(e.target.value) : undefined,
+                      })
+                    }
+                    placeholder="e.g., 128000"
                   />
                 </div>
-              </div>
-            )}
 
-            {/* Architecture Tab */}
-            {activeEditTab === "architecture" && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Instruct Type</label>
-                    <select
-                      value={formData.instruct_type}
-                      onChange={(e) => setFormData({ ...formData, instruct_type: e.target.value })}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="">Select instruct type</option>
-                      {INSTRUCT_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium">Tokenizer</label>
-                    <select
-                      value={formData.tokenizer}
-                      onChange={(e) => setFormData({ ...formData, tokenizer: e.target.value })}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="">Select tokenizer</option>
-                      {TOKENIZERS.map((tok) => (
-                        <option key={tok} value={tok}>
-                          {tok}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Tags (comma-separated)</label>
+                  <Input
+                    value={formData.tags}
+                    onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                    placeholder="e.g., vision, reasoning, multimodal"
+                  />
+                  <p className="text-xs text-muted-foreground">Separate tags with commas</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Architecture */}
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold mb-3">Architecture</h3>
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Instruct Type</label>
+                  <select
+                    value={formData.instruct_type}
+                    onChange={(e) => setFormData({ ...formData, instruct_type: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Select instruct type</option>
+                    {INSTRUCT_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Tokenizer</label>
+                  <select
+                    value={formData.tokenizer}
+                    onChange={(e) => setFormData({ ...formData, tokenizer: e.target.value })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Select tokenizer</option>
+                    {TOKENIZERS.map((tok) => (
+                      <option key={tok} value={tok}>
+                        {tok}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="grid gap-2">
                   <label className="text-sm font-medium">Modality</label>
                   <Input
@@ -1145,9 +1091,9 @@ export function CatalogsManagement() {
                 </div>
 
                 {/* Input Modalities */}
-                <div className="space-y-2">
+                <div className="grid gap-2">
                   <label className="text-sm font-medium">Input Modalities</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {["text", "image", "file", "audio", "video"].map((mod) => (
                       <label key={mod} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -1163,9 +1109,9 @@ export function CatalogsManagement() {
                 </div>
 
                 {/* Output Modalities */}
-                <div className="space-y-2">
+                <div className="grid gap-2">
                   <label className="text-sm font-medium">Output Modalities</label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {["text", "image", "embedding"].map((mod) => (
                       <label key={mod} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -1180,18 +1126,16 @@ export function CatalogsManagement() {
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Parameters Tab */}
-            {activeEditTab === "parameters" && (
-              <div className="space-y-6">
+            {/* Supported Parameters */}
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold mb-3">Supported Parameters</h3>
+              <div className="space-y-4">
                 {/* Available Parameters */}
-                <div className="space-y-2">
+                <div className="grid gap-2">
                   <label className="text-sm font-medium">Available Parameters</label>
-                  <p className="text-xs text-muted-foreground">
-                    Select which parameters this model supports
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 max-h-[200px] overflow-y-auto border rounded-md p-3">
+                  <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
                     {PARAMETER_NAMES.map((param) => (
                       <label key={param} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -1207,14 +1151,11 @@ export function CatalogsManagement() {
                 </div>
 
                 {/* Default Parameter Values */}
-                <div className="space-y-3">
+                <div className="grid gap-2">
                   <label className="text-sm font-medium">Default Parameter Values</label>
-                  <p className="text-xs text-muted-foreground">
-                    Leave empty to use system defaults. Clear button removes the value.
-                  </p>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div className="grid gap-1">
-                      <label className="text-xs text-muted-foreground">Temperature</label>
+                      <label className="text-xs text-muted-foreground">Temperature (optional)</label>
                       <div className="flex gap-1">
                         <Input
                           type="number"
@@ -1225,22 +1166,23 @@ export function CatalogsManagement() {
                           onChange={(e) =>
                             setFormData({ ...formData, default_temperature: e.target.value })
                           }
-                          placeholder="e.g., 0.7"
+                          placeholder="0.7"
                           className="text-sm"
                         />
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => setFormData({ ...formData, default_temperature: "" })}
                           className="px-2"
+                          title="Clear value"
                         >
                           <X className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
                     <div className="grid gap-1">
-                      <label className="text-xs text-muted-foreground">Top P</label>
+                      <label className="text-xs text-muted-foreground">Top P (optional)</label>
                       <div className="flex gap-1">
                         <Input
                           type="number"
@@ -1251,22 +1193,23 @@ export function CatalogsManagement() {
                           onChange={(e) =>
                             setFormData({ ...formData, default_top_p: e.target.value })
                           }
-                          placeholder="e.g., 0.9"
+                          placeholder="0.8"
                           className="text-sm"
                         />
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => setFormData({ ...formData, default_top_p: "" })}
                           className="px-2"
+                          title="Clear value"
                         >
                           <X className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
                     <div className="grid gap-1">
-                      <label className="text-xs text-muted-foreground">Top K</label>
+                      <label className="text-xs text-muted-foreground">Top K (optional)</label>
                       <div className="flex gap-1">
                         <Input
                           type="number"
@@ -1276,22 +1219,23 @@ export function CatalogsManagement() {
                           onChange={(e) =>
                             setFormData({ ...formData, default_top_k: e.target.value })
                           }
-                          placeholder="e.g., 40"
+                          placeholder="20"
                           className="text-sm"
                         />
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => setFormData({ ...formData, default_top_k: "" })}
                           className="px-2"
+                          title="Clear value"
                         >
                           <X className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
                     <div className="grid gap-1">
-                      <label className="text-xs text-muted-foreground">Presence Penalty</label>
+                      <label className="text-xs text-muted-foreground">Presence Penalty (optional)</label>
                       <div className="flex gap-1">
                         <Input
                           type="number"
@@ -1307,17 +1251,18 @@ export function CatalogsManagement() {
                         />
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => setFormData({ ...formData, default_presence_penalty: "" })}
                           className="px-2"
+                          title="Clear value"
                         >
                           <X className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
                     <div className="grid gap-1">
-                      <label className="text-xs text-muted-foreground">Repetition Penalty</label>
+                      <label className="text-xs text-muted-foreground">Repetition Penalty (optional)</label>
                       <div className="flex gap-1">
                         <Input
                           type="number"
@@ -1327,22 +1272,23 @@ export function CatalogsManagement() {
                           onChange={(e) =>
                             setFormData({ ...formData, default_repetition_penalty: e.target.value })
                           }
-                          placeholder="e.g., 1.0"
+                          placeholder="1.12"
                           className="text-sm"
                         />
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => setFormData({ ...formData, default_repetition_penalty: "" })}
                           className="px-2"
+                          title="Clear value"
                         >
                           <X className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
                     <div className="grid gap-1">
-                      <label className="text-xs text-muted-foreground">Frequency Penalty</label>
+                      <label className="text-xs text-muted-foreground">Frequency Penalty (optional)</label>
                       <div className="flex gap-1">
                         <Input
                           type="number"
@@ -1358,10 +1304,11 @@ export function CatalogsManagement() {
                         />
                         <Button
                           type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => setFormData({ ...formData, default_frequency_penalty: "" })}
                           className="px-2"
+                          title="Clear value"
                         >
                           <X className="w-3 h-3" />
                         </Button>
@@ -1370,46 +1317,65 @@ export function CatalogsManagement() {
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* Capabilities Tab */}
-            {activeEditTab === "capabilities" && (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Select the capabilities this model supports
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { key: "supports_images", label: "Vision Support", desc: "Can process images" },
-                    { key: "supports_audio", label: "Audio Support", desc: "Can process audio" },
-                    { key: "supports_video", label: "Video Support", desc: "Can process video" },
-                    { key: "supports_reasoning", label: "Reasoning Support", desc: "Has reasoning capabilities" },
-                    { key: "supports_embeddings", label: "Embeddings Support", desc: "Can generate embeddings" },
-                    { key: "supports_tools", label: "Tool/Function Calling", desc: "Can use tools and functions" },
-                    { key: "supports_browser", label: "Browser Support", desc: "Can browse the web" },
-                    { key: "supports_instruct", label: "Instruct Backup", desc: "Supports instruct mode" },
-                  ].map(({ key, label, desc }) => (
-                    <label
-                      key={key}
-                      className="flex items-start gap-3 p-3 border rounded-lg cursor-pointer hover:bg-accent/50 transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formData[key as keyof CatalogFormData] as boolean}
-                        onChange={(e) =>
-                          setFormData({ ...formData, [key]: e.target.checked })
-                        }
-                        className="rounded mt-0.5"
-                      />
-                      <div>
-                        <div className="text-sm font-medium">{label}</div>
-                        <div className="text-xs text-muted-foreground">{desc}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+            {/* Capabilities */}
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold mb-3">Capabilities</h3>
+              <div className="space-y-2">
+                {[
+                  { key: "supports_images", label: "Vision Support" },
+                  { key: "supports_embeddings", label: "Embeddings Support" },
+                  { key: "supports_reasoning", label: "Reasoning Support" },
+                  { key: "supports_instruct", label: "Supports Instruct Backup" },
+                  { key: "supports_audio", label: "Audio Support" },
+                  { key: "supports_video", label: "Video Support" },
+                  { key: "supports_tools", label: "Tool/Function Calling" },
+                  { key: "supports_browser", label: "Browser Support" },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData[key as keyof CatalogFormData] as boolean}
+                      onChange={(e) =>
+                        setFormData({ ...formData, [key]: e.target.checked })
+                      }
+                      className="rounded"
+                    />
+                    <span className="text-sm">{label}</span>
+                  </label>
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* Additional Information */}
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold mb-3">Additional Information</h3>
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Notes</label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Add any notes about this catalog..."
+                    rows={3}
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_moderated}
+                    onChange={(e) =>
+                      setFormData({ ...formData, is_moderated: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <span className="text-sm">Is Moderated</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <DialogFooter className="border-t pt-4">
@@ -1420,7 +1386,7 @@ export function CatalogsManagement() {
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : null}
-              Update Catalog
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>
