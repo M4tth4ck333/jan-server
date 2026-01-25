@@ -3,16 +3,31 @@ import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Box,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  ExternalLink,
   Loader2,
-  RefreshCw,
-  Search,
   MoreHorizontal,
+  Pencil,
   Power,
   PowerOff,
-  Filter,
+  RefreshCw,
+  Search,
+  Square,
+  CheckSquare,
 } from "lucide-react";
 import { Button } from "@janhq/interfaces/button";
 import { Input } from "@janhq/interfaces/input";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@janhq/interfaces/dialog";
 import {
   DropDrawer,
   DropDrawerContent,
@@ -24,6 +39,51 @@ import {
   providerManagementService,
 } from "@/services/admin-service";
 
+const CATEGORIES = [
+  { value: "jan", label: "Jan" },
+  { value: "legacy", label: "Legacy" },
+];
+
+interface ModelFormData {
+  model_display_name: string;
+  category: string;
+  category_order_number: number | undefined;
+  model_order_number: number | undefined;
+  pricing_prompt: number | undefined;
+  pricing_completion: number | undefined;
+  context_length: number | undefined;
+  max_completion_tokens: number | undefined;
+  supports_images: boolean;
+  supports_audio: boolean;
+  supports_video: boolean;
+  supports_reasoning: boolean;
+  supports_embeddings: boolean;
+  supports_tools: boolean;
+  supports_browser: boolean;
+  instruct_model_public_id: string;
+  active: boolean;
+}
+
+const defaultFormData: ModelFormData = {
+  model_display_name: "",
+  category: "jan",
+  category_order_number: undefined,
+  model_order_number: undefined,
+  pricing_prompt: undefined,
+  pricing_completion: undefined,
+  context_length: undefined,
+  max_completion_tokens: undefined,
+  supports_images: false,
+  supports_audio: false,
+  supports_video: false,
+  supports_reasoning: false,
+  supports_embeddings: false,
+  supports_tools: false,
+  supports_browser: false,
+  instruct_model_public_id: "",
+  active: true,
+};
+
 export function ProviderModelsManagement() {
   const [models, setModels] = useState<ProviderModel[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -32,11 +92,24 @@ export function ProviderModelsManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<string>("");
   const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
+  const [supportsImagesFilter, setSupportsImagesFilter] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
     total: 0,
   });
+
+  // Selection state for bulk operations
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+
+  // Dialog states
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [modelToEdit, setModelToEdit] = useState<ProviderModel | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState<ModelFormData>(defaultFormData);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   useEffect(() => {
     loadProviders();
@@ -44,7 +117,7 @@ export function ProviderModelsManagement() {
 
   useEffect(() => {
     loadModels();
-  }, [pagination.page, selectedProvider, activeFilter]);
+  }, [pagination.page, selectedProvider, activeFilter, supportsImagesFilter]);
 
   async function loadProviders() {
     try {
@@ -69,9 +142,14 @@ export function ProviderModelsManagement() {
       if (activeFilter !== "all") {
         params.active = activeFilter === "active";
       }
+      if (supportsImagesFilter) {
+        params.supports_images = true;
+      }
       const response = await providerModelService.listProviderModels(params);
       setModels(response.data || []);
       setPagination((prev) => ({ ...prev, total: response.total || 0 }));
+      // Clear selection when page changes
+      setSelectedModels(new Set());
     } catch (err) {
       console.error("Failed to load models:", err);
       setError("Failed to load provider models");
@@ -88,12 +166,142 @@ export function ProviderModelsManagement() {
       await loadModels();
     } catch (err) {
       console.error("Failed to toggle model status:", err);
+      alert("Failed to update model status");
     }
+  }
+
+  async function handleUpdate() {
+    if (!modelToEdit) return;
+
+    try {
+      setIsSubmitting(true);
+
+      const updateData: Partial<ProviderModel> = {
+        model_display_name: formData.model_display_name,
+        category: formData.category,
+        category_order_number: formData.category_order_number,
+        model_order_number: formData.model_order_number,
+        pricing: {
+          prompt: formData.pricing_prompt,
+          completion: formData.pricing_completion,
+        },
+        token_limits: {
+          context_length: formData.context_length,
+          max_completion_tokens: formData.max_completion_tokens,
+        },
+        supports_images: formData.supports_images,
+        supports_audio: formData.supports_audio,
+        supports_video: formData.supports_video,
+        supports_reasoning: formData.supports_reasoning,
+        supports_embeddings: formData.supports_embeddings,
+        supports_tools: formData.supports_tools,
+        supports_browser: formData.supports_browser,
+        instruct_model_public_id: formData.instruct_model_public_id || undefined,
+        active: formData.active,
+      };
+
+      await providerModelService.updateProviderModel(modelToEdit.id, updateData);
+      setEditDialogOpen(false);
+      setModelToEdit(null);
+      resetForm();
+      await loadModels();
+    } catch (err) {
+      console.error("Failed to update model:", err);
+      alert("Failed to update model");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleBulkActivate() {
+    if (selectedModels.size === 0) return;
+
+    try {
+      setIsBulkUpdating(true);
+      // Update each selected model
+      const promises = Array.from(selectedModels).map((id) =>
+        providerModelService.updateProviderModel(id, { active: true })
+      );
+      await Promise.all(promises);
+      setSelectedModels(new Set());
+      await loadModels();
+    } catch (err) {
+      console.error("Failed to bulk activate:", err);
+      alert("Failed to activate some models");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  }
+
+  async function handleBulkDeactivate() {
+    if (selectedModels.size === 0) return;
+
+    try {
+      setIsBulkUpdating(true);
+      const promises = Array.from(selectedModels).map((id) =>
+        providerModelService.updateProviderModel(id, { active: false })
+      );
+      await Promise.all(promises);
+      setSelectedModels(new Set());
+      await loadModels();
+    } catch (err) {
+      console.error("Failed to bulk deactivate:", err);
+      alert("Failed to deactivate some models");
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  }
+
+  function resetForm() {
+    setFormData(defaultFormData);
+  }
+
+  function openEditDialog(model: ProviderModel) {
+    setModelToEdit(model);
+    setFormData({
+      model_display_name: model.model_display_name,
+      category: model.category || "jan",
+      category_order_number: model.category_order_number,
+      model_order_number: model.model_order_number,
+      pricing_prompt: model.pricing?.prompt,
+      pricing_completion: model.pricing?.completion,
+      context_length: model.token_limits?.context_length,
+      max_completion_tokens: model.token_limits?.max_completion_tokens,
+      supports_images: model.supports_images || false,
+      supports_audio: model.supports_audio || false,
+      supports_video: model.supports_video || false,
+      supports_reasoning: model.supports_reasoning || false,
+      supports_embeddings: model.supports_embeddings || false,
+      supports_tools: model.supports_tools || false,
+      supports_browser: model.supports_browser || false,
+      instruct_model_public_id: model.instruct_model_public_id || "",
+      active: model.active,
+    });
+    setEditDialogOpen(true);
+  }
+
+  function toggleModelSelection(modelId: string) {
+    const newSelected = new Set(selectedModels);
+    if (newSelected.has(modelId)) {
+      newSelected.delete(modelId);
+    } else {
+      newSelected.add(modelId);
+    }
+    setSelectedModels(newSelected);
+  }
+
+  function selectAllModels() {
+    setSelectedModels(new Set(models.map((m) => m.id)));
+  }
+
+  function deselectAllModels() {
+    setSelectedModels(new Set());
   }
 
   const filteredModels = models.filter(
     (m) =>
       m.model_display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.model_public_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.provider_vendor?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -140,6 +348,7 @@ export function ProviderModelsManagement() {
         </p>
       </div>
 
+      {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -200,23 +409,107 @@ export function ProviderModelsManagement() {
           </Button>
         </div>
 
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="supportsImages"
+            checked={supportsImagesFilter}
+            onChange={(e) => {
+              setSupportsImagesFilter(e.target.checked);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+            className="rounded"
+          />
+          <label htmlFor="supportsImages" className="text-sm cursor-pointer">
+            Vision Only
+          </label>
+        </div>
+
         <Button variant="outline" onClick={loadModels}>
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
         </Button>
+
+        {(searchQuery || selectedProvider || activeFilter !== "all" || supportsImagesFilter) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchQuery("");
+              setSelectedProvider("");
+              setActiveFilter("all");
+              setSupportsImagesFilter(false);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
+          >
+            Clear Filters
+          </Button>
+        )}
       </div>
 
-      <div className="text-sm text-muted-foreground">
-        Showing {filteredModels.length} of {pagination.total} models
+      {/* Bulk Actions */}
+      {selectedModels.size > 0 && (
+        <div className="flex items-center gap-4 p-3 bg-muted rounded-lg">
+          <span className="text-sm font-medium">
+            {selectedModels.size} model{selectedModels.size !== 1 ? "s" : ""} selected
+          </span>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkActivate}
+              disabled={isBulkUpdating}
+            >
+              {isBulkUpdating ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Power className="w-4 h-4 mr-2" />
+              )}
+              Activate Selected
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBulkDeactivate}
+              disabled={isBulkUpdating}
+            >
+              {isBulkUpdating ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <PowerOff className="w-4 h-4 mr-2" />
+              )}
+              Deactivate Selected
+            </Button>
+            <Button size="sm" variant="ghost" onClick={deselectAllModels}>
+              Deselect All
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Showing {filteredModels.length} of {pagination.total} models
+        </div>
+        {models.length > 0 && selectedModels.size === 0 && (
+          <Button size="sm" variant="ghost" onClick={selectAllModels}>
+            <CheckSquare className="w-4 h-4 mr-2" />
+            Select All
+          </Button>
+        )}
       </div>
 
+      {/* Models Table */}
       <div className="border rounded-lg overflow-hidden">
         <table className="w-full">
           <thead className="bg-muted/50">
             <tr>
-              <th className="text-left p-4 font-medium">Model ID</th>
+              <th className="w-10 p-4"></th>
+              <th className="text-left p-4 font-medium">Model</th>
               <th className="text-left p-4 font-medium">Provider</th>
               <th className="text-left p-4 font-medium">Status</th>
+              <th className="text-left p-4 font-medium">Category</th>
+              <th className="text-left p-4 font-medium">Pricing</th>
               <th className="text-left p-4 font-medium">Context</th>
               <th className="text-right p-4 font-medium">Actions</th>
             </tr>
@@ -224,7 +517,7 @@ export function ProviderModelsManagement() {
           <tbody className="divide-y">
             {filteredModels.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-12 text-muted-foreground">
+                <td colSpan={8} className="text-center py-12 text-muted-foreground">
                   {searchQuery ? "No models match your search" : "No models found"}
                 </td>
               </tr>
@@ -232,16 +525,41 @@ export function ProviderModelsManagement() {
               filteredModels.map((model) => (
                 <tr key={model.id} className="hover:bg-muted/30">
                   <td className="p-4">
+                    <button
+                      onClick={() => toggleModelSelection(model.id)}
+                      className="p-1 hover:bg-accent rounded transition-colors"
+                    >
+                      {selectedModels.has(model.id) ? (
+                        <CheckSquare className="w-4 h-4 text-primary" />
+                      ) : (
+                        <Square className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </button>
+                  </td>
+                  <td className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="bg-green-100 dark:bg-green-900/20 p-2 rounded">
                         <Box className="w-4 h-4 text-green-600" />
                       </div>
                       <div>
-                        <div className="font-medium">{model.model_public_id}</div>
+                        <div className="font-medium">
+                          <code className="text-sm bg-muted px-1.5 py-0.5 rounded">
+                            {model.model_public_id}
+                          </code>
+                        </div>
                         {model.model_display_name && model.model_display_name !== model.model_public_id && (
-                          <div className="text-sm text-muted-foreground">
+                          <div className="text-sm text-muted-foreground mt-0.5">
                             {model.model_display_name}
                           </div>
+                        )}
+                        {model.model_catalog_id && (
+                          <Link
+                            to="/admin/models/catalogs"
+                            className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1"
+                          >
+                            View Catalog
+                            <ExternalLink className="w-3 h-3" />
+                          </Link>
                         )}
                       </div>
                     </div>
@@ -260,6 +578,21 @@ export function ProviderModelsManagement() {
                       {model.active ? "Active" : "Inactive"}
                     </span>
                   </td>
+                  <td className="p-4">
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                      {model.category || "-"}
+                    </span>
+                  </td>
+                  <td className="p-4 text-sm text-muted-foreground">
+                    {model.pricing?.prompt !== undefined ? (
+                      <div>
+                        <div>${model.pricing.prompt.toFixed(2)}/M in</div>
+                        <div>${model.pricing.completion?.toFixed(2) || "?"}/M out</div>
+                      </div>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                   <td className="p-4 text-muted-foreground">
                     {model.token_limits?.context_length
                       ? `${(model.token_limits.context_length / 1000).toFixed(0)}K`
@@ -273,6 +606,12 @@ export function ProviderModelsManagement() {
                         </Button>
                       </DropDrawerTrigger>
                       <DropDrawerContent className="w-48">
+                        <DropDrawerItem onClick={() => openEditDialog(model)}>
+                          <div className="flex gap-2 items-center">
+                            <Pencil className="w-4 h-4" />
+                            <span>Edit</span>
+                          </div>
+                        </DropDrawerItem>
                         <DropDrawerItem onClick={() => handleToggleActive(model)}>
                           <div className="flex gap-2 items-center">
                             {model.active ? (
@@ -306,6 +645,7 @@ export function ProviderModelsManagement() {
               onClick={() => setPagination((prev) => ({ ...prev, page: prev.page - 1 }))}
               disabled={pagination.page <= 1}
             >
+              <ChevronLeft className="w-4 h-4 mr-1" />
               Previous
             </Button>
             <Button
@@ -315,10 +655,331 @@ export function ProviderModelsManagement() {
               disabled={pagination.page >= totalPages}
             >
               Next
+              <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           </div>
         </div>
       )}
+
+      {/* Edit Model Dialog */}
+      <Dialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditDialogOpen(false);
+            setModelToEdit(null);
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Model</DialogTitle>
+            <DialogDescription>
+              Update the model configuration for{" "}
+              <code className="bg-muted px-1.5 py-0.5 rounded">
+                {modelToEdit?.model_public_id}
+              </code>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            {/* Basic Info */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Basic Information
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Display Name</label>
+                  <Input
+                    value={formData.model_display_name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, model_display_name: e.target.value })
+                    }
+                    placeholder="Model Display Name"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) =>
+                      setFormData({ ...formData, category: e.target.value })
+                    }
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Category Order</label>
+                  <Input
+                    type="number"
+                    value={formData.category_order_number ?? ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        category_order_number: e.target.value ? parseInt(e.target.value) : undefined,
+                      })
+                    }
+                    placeholder="Sort order within category"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Model Order</label>
+                  <Input
+                    type="number"
+                    value={formData.model_order_number ?? ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        model_order_number: e.target.value ? parseInt(e.target.value) : undefined,
+                      })
+                    }
+                    placeholder="Sort order within models"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Pricing */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Pricing (per 1M tokens)
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Prompt Price ($)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.pricing_prompt ?? ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        pricing_prompt: e.target.value ? parseFloat(e.target.value) : undefined,
+                      })
+                    }
+                    placeholder="e.g., 3.00"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Completion Price ($)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.pricing_completion ?? ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        pricing_completion: e.target.value ? parseFloat(e.target.value) : undefined,
+                      })
+                    }
+                    placeholder="e.g., 15.00"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Token Limits */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Token Limits
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Context Length</label>
+                  <Input
+                    type="number"
+                    value={formData.context_length ?? ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        context_length: e.target.value ? parseInt(e.target.value) : undefined,
+                      })
+                    }
+                    placeholder="e.g., 128000"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Max Completion Tokens</label>
+                  <Input
+                    type="number"
+                    value={formData.max_completion_tokens ?? ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        max_completion_tokens: e.target.value ? parseInt(e.target.value) : undefined,
+                      })
+                    }
+                    placeholder="e.g., 4096"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Capabilities */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Capabilities
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="supports_images"
+                    checked={formData.supports_images}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supports_images: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="supports_images" className="text-sm">
+                    Vision
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="supports_audio"
+                    checked={formData.supports_audio}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supports_audio: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="supports_audio" className="text-sm">
+                    Audio
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="supports_video"
+                    checked={formData.supports_video}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supports_video: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="supports_video" className="text-sm">
+                    Video
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="supports_reasoning"
+                    checked={formData.supports_reasoning}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supports_reasoning: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="supports_reasoning" className="text-sm">
+                    Reasoning
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="supports_embeddings"
+                    checked={formData.supports_embeddings}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supports_embeddings: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="supports_embeddings" className="text-sm">
+                    Embeddings
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="supports_tools"
+                    checked={formData.supports_tools}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supports_tools: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="supports_tools" className="text-sm">
+                    Tools
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="supports_browser"
+                    checked={formData.supports_browser}
+                    onChange={(e) =>
+                      setFormData({ ...formData, supports_browser: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="supports_browser" className="text-sm">
+                    Browser
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Additional Settings
+              </h3>
+              {formData.supports_reasoning && (
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Instruct Model Backup</label>
+                  <Input
+                    value={formData.instruct_model_public_id}
+                    onChange={(e) =>
+                      setFormData({ ...formData, instruct_model_public_id: e.target.value })
+                    }
+                    placeholder="model_public_id for fallback"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Fallback model for reasoning mode
+                  </p>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="active"
+                  checked={formData.active}
+                  onChange={(e) =>
+                    setFormData({ ...formData, active: e.target.checked })
+                  }
+                  className="rounded"
+                />
+                <label htmlFor="active" className="text-sm font-medium">
+                  Active
+                </label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleUpdate} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              Update Model
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

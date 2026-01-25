@@ -11,6 +11,11 @@ import {
   ChevronDown,
   ChevronRight,
   AlertTriangle,
+  Copy,
+  Check,
+  Filter,
+  Info,
+  Shield,
 } from "lucide-react";
 import { Button } from "@janhq/interfaces/button";
 import { Input } from "@janhq/interfaces/input";
@@ -30,6 +35,9 @@ import {
   DropDrawerTrigger,
 } from "@janhq/interfaces/dropdrawer";
 import { mcpToolService } from "@/services/admin-service";
+import { cn } from "@/lib/utils";
+
+type EditTabType = "general" | "restrictions";
 
 export function MCPToolsManagement() {
   const [tools, setTools] = useState<MCPTool[]>([]);
@@ -37,11 +45,14 @@ export function MCPToolsManagement() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Dialog states
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [toolToEdit, setToolToEdit] = useState<MCPTool | null>(null);
+  const [activeEditTab, setActiveEditTab] = useState<EditTabType>("general");
 
   // Form state
   const [formData, setFormData] = useState<UpdateMCPToolRequest>({
@@ -60,7 +71,7 @@ export function MCPToolsManagement() {
 
   useEffect(() => {
     loadTools();
-  }, [pagination.page, selectedCategory]);
+  }, [pagination.page, selectedCategory, selectedStatus]);
 
   async function loadTools() {
     try {
@@ -72,6 +83,11 @@ export function MCPToolsManagement() {
       };
       if (selectedCategory) {
         params.category = selectedCategory;
+      }
+      if (selectedStatus === "active") {
+        params.is_active = true;
+      } else if (selectedStatus === "inactive") {
+        params.is_active = false;
       }
       const response = await mcpToolService.listMCPTools(params);
       setTools(response.data || []);
@@ -98,11 +114,17 @@ export function MCPToolsManagement() {
   async function handleUpdate() {
     if (!toolToEdit) return;
     try {
+      // Parse keywords from newline-separated input
+      const keywords = keywordsInput
+        .split("\n")
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0);
+
       await mcpToolService.updateMCPTool(toolToEdit.public_id, {
         description: formData.description,
         category: formData.category,
         is_active: formData.is_active,
-        disallowed_keywords: formData.disallowed_keywords,
+        disallowed_keywords: keywords,
       });
       setEditDialogOpen(false);
       setToolToEdit(null);
@@ -121,6 +143,7 @@ export function MCPToolsManagement() {
       disallowed_keywords: [],
     });
     setKeywordsInput("");
+    setActiveEditTab("general");
   }
 
   function openEditDialog(tool: MCPTool) {
@@ -131,17 +154,16 @@ export function MCPToolsManagement() {
       is_active: tool.is_active,
       disallowed_keywords: tool.disallowed_keywords || [],
     });
-    setKeywordsInput((tool.disallowed_keywords || []).join(", "));
+    // Convert to newline-separated for regex patterns support
+    setKeywordsInput((tool.disallowed_keywords || []).join("\n"));
+    setActiveEditTab("general");
     setEditDialogOpen(true);
   }
 
-  function handleKeywordsChange(value: string) {
-    setKeywordsInput(value);
-    const keywords = value
-      .split(",")
-      .map((k) => k.trim())
-      .filter((k) => k.length > 0);
-    setFormData({ ...formData, disallowed_keywords: keywords });
+  function copyToClipboard(text: string, toolId: string) {
+    navigator.clipboard.writeText(text);
+    setCopiedId(toolId);
+    setTimeout(() => setCopiedId(null), 2000);
   }
 
   const categories = [...new Set(tools.map((t) => t.category).filter(Boolean))].sort();
@@ -152,6 +174,12 @@ export function MCPToolsManagement() {
       t.tool_key?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Stats
+  const activeCount = tools.filter((t) => t.is_active).length;
+  const restrictedCount = tools.filter(
+    (t) => t.disallowed_keywords && t.disallowed_keywords.length > 0
+  ).length;
 
   const totalPages = Math.ceil(pagination.total / pagination.limit);
 
@@ -178,6 +206,11 @@ export function MCPToolsManagement() {
     );
   }
 
+  const editTabs: { id: EditTabType; label: string; icon: React.ElementType }[] = [
+    { id: "general", label: "General", icon: Info },
+    { id: "restrictions", label: "Restrictions", icon: Shield },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -185,6 +218,22 @@ export function MCPToolsManagement() {
         <p className="text-muted-foreground mt-2">
           Manage Model Context Protocol tools and their configurations
         </p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-card rounded-lg border p-4">
+          <div className="text-sm text-muted-foreground">Total Tools</div>
+          <div className="text-2xl font-bold">{pagination.total}</div>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
+          <div className="text-sm text-muted-foreground">Active</div>
+          <div className="text-2xl font-bold text-green-600">{activeCount}</div>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
+          <div className="text-sm text-muted-foreground">With Restrictions</div>
+          <div className="text-2xl font-bold text-yellow-600">{restrictedCount}</div>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -212,6 +261,19 @@ export function MCPToolsManagement() {
               {cat}
             </option>
           ))}
+        </select>
+
+        <select
+          value={selectedStatus}
+          onChange={(e) => {
+            setSelectedStatus(e.target.value);
+            setPagination((prev) => ({ ...prev, page: 1 }));
+          }}
+          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
         </select>
 
         <Button variant="outline" onClick={loadTools}>
@@ -246,7 +308,7 @@ export function MCPToolsManagement() {
                     <Wrench className="w-5 h-5 text-cyan-600" />
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-semibold">{tool.name}</h3>
                       <span
                         className={`px-2 py-0.5 text-xs rounded-full ${
@@ -260,13 +322,31 @@ export function MCPToolsManagement() {
                       {tool.disallowed_keywords && tool.disallowed_keywords.length > 0 && (
                         <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-full flex items-center gap-1">
                           <AlertTriangle className="w-3 h-3" />
-                          Restricted
+                          {tool.disallowed_keywords.length} restriction{tool.disallowed_keywords.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                      {tool.category && (
+                        <span className="px-2 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 rounded">
+                          {tool.category}
                         </span>
                       )}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      Key: {tool.tool_key}
-                      {tool.category && ` | Category: ${tool.category}`}
+                    <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                      <span className="font-mono text-xs">{tool.tool_key}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyToClipboard(tool.public_id, tool.id);
+                        }}
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Copy ID"
+                      >
+                        {copiedId === tool.id ? (
+                          <Check className="w-3 h-3 text-green-500" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
                     </div>
                     {tool.description && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
@@ -306,6 +386,14 @@ export function MCPToolsManagement() {
                           <span>{tool.is_active ? "Deactivate" : "Activate"}</span>
                         </div>
                       </DropDrawerItem>
+                      <DropDrawerItem
+                        onClick={() => copyToClipboard(tool.public_id, tool.id)}
+                      >
+                        <div className="flex gap-2 items-center">
+                          <Copy className="w-4 h-4" />
+                          <span>Copy ID</span>
+                        </div>
+                      </DropDrawerItem>
                     </DropDrawerContent>
                   </DropDrawer>
                 </div>
@@ -325,21 +413,27 @@ export function MCPToolsManagement() {
 
                     {tool.disallowed_keywords && tool.disallowed_keywords.length > 0 && (
                       <div>
-                        <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
-                          Disallowed Keywords
+                        <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                          <Shield className="w-3 h-3" />
+                          Disallowed Keywords / Patterns
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          {tool.disallowed_keywords.map((keyword) => (
-                            <span
-                              key={keyword}
-                              className="px-2 py-1 text-xs bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400 rounded"
+                        <div className="space-y-1">
+                          {tool.disallowed_keywords.map((keyword, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2"
                             >
-                              {keyword}
-                            </span>
+                              <span className="px-2 py-1 text-xs bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400 rounded font-mono">
+                                {keyword}
+                              </span>
+                              {keyword.includes("*") || keyword.includes("^") || keyword.includes("$") || keyword.includes("\\") ? (
+                                <span className="text-xs text-muted-foreground">(regex pattern)</span>
+                              ) : null}
+                            </div>
                           ))}
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                          Tool execution will be blocked if input contains these keywords
+                          Tool execution will be blocked if input matches these keywords or patterns
                         </p>
                       </div>
                     )}
@@ -349,13 +443,13 @@ export function MCPToolsManagement() {
                         <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
                           Metadata
                         </div>
-                        <pre className="text-sm bg-muted p-3 rounded-md overflow-x-auto">
+                        <pre className="text-sm bg-muted p-3 rounded-md overflow-x-auto font-mono">
                           {JSON.stringify(tool.metadata, null, 2)}
                         </pre>
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-2 gap-4 text-sm pt-2 border-t">
                       <div>
                         <span className="text-muted-foreground">Created: </span>
                         {new Date(tool.created_at).toLocaleDateString()}
@@ -400,7 +494,7 @@ export function MCPToolsManagement() {
         </div>
       )}
 
-      {/* Edit Dialog */}
+      {/* Edit Dialog with Tabs */}
       <Dialog
         open={editDialogOpen}
         onOpenChange={(open) => {
@@ -411,68 +505,168 @@ export function MCPToolsManagement() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit MCP Tool</DialogTitle>
             <DialogDescription>
               Update the tool configuration. Tool key and name cannot be changed.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Tool Key</label>
-              <Input value={toolToEdit?.tool_key || ""} disabled />
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Name</label>
-              <Input value={toolToEdit?.name || ""} disabled />
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Category</label>
-              <Input
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder="search, code, utility, etc."
-              />
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Brief description of the tool"
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Disallowed Keywords</label>
-              <Input
-                value={keywordsInput}
-                onChange={(e) => handleKeywordsChange(e.target.value)}
-                placeholder="keyword1, keyword2, keyword3"
-              />
-              <p className="text-xs text-muted-foreground">
-                Comma-separated list of keywords that will block tool execution
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="is_active"
-                checked={formData.is_active}
-                onChange={(e) =>
-                  setFormData({ ...formData, is_active: e.target.checked })
-                }
-                className="rounded"
-              />
-              <label htmlFor="is_active" className="text-sm">
-                Active
-              </label>
-            </div>
+
+          {/* Tabs */}
+          <div className="border-b">
+            <nav className="flex space-x-4 px-1" aria-label="Tabs">
+              {editTabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveEditTab(tab.id)}
+                    className={cn(
+                      "flex items-center gap-2 py-2 px-3 text-sm font-medium border-b-2 -mb-px transition-colors",
+                      activeEditTab === tab.id
+                        ? "border-primary text-primary"
+                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50"
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
-          <DialogFooter>
+
+          <div className="flex-1 overflow-y-auto py-4">
+            {/* General Tab */}
+            {activeEditTab === "general" && (
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Tool Key</label>
+                  <Input value={toolToEdit?.tool_key || ""} disabled className="font-mono" />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Name</label>
+                  <Input value={toolToEdit?.name || ""} disabled />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <Input
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    placeholder="search, code, utility, etc."
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    placeholder="Brief description of the tool functionality"
+                    className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="is_active"
+                    checked={formData.is_active}
+                    onChange={(e) =>
+                      setFormData({ ...formData, is_active: e.target.checked })
+                    }
+                    className="rounded"
+                  />
+                  <label htmlFor="is_active" className="text-sm">
+                    Active (tool can be used in conversations)
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Restrictions Tab */}
+            {activeEditTab === "restrictions" && (
+              <div className="grid gap-4">
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-900/30 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-medium text-yellow-800 dark:text-yellow-400">
+                        Content Restrictions
+                      </div>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-500 mt-1">
+                        Disallowed keywords prevent the tool from being executed when the input contains matching content.
+                        This helps prevent misuse of the tool.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium">
+                    Disallowed Keywords / Patterns (one per line)
+                  </label>
+                  <textarea
+                    value={keywordsInput}
+                    onChange={(e) => setKeywordsInput(e.target.value)}
+                    placeholder="password
+secret
+api_key
+\b(SELECT|INSERT|UPDATE|DELETE)\b.*FROM
+<script>.*</script>"
+                    className="flex min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter one keyword or regex pattern per line. Regex patterns will be matched against tool inputs.
+                  </p>
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+                    Pattern Examples
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex gap-2">
+                      <code className="px-1.5 py-0.5 bg-background rounded text-xs">password</code>
+                      <span className="text-muted-foreground">- Simple keyword match</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <code className="px-1.5 py-0.5 bg-background rounded text-xs">\bapi[_-]?key\b</code>
+                      <span className="text-muted-foreground">- Regex for api_key, api-key, apikey</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <code className="px-1.5 py-0.5 bg-background rounded text-xs">{"<script>.*</script>"}</code>
+                      <span className="text-muted-foreground">- Block script tags</span>
+                    </div>
+                  </div>
+                </div>
+
+                {keywordsInput && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">
+                      Current Restrictions ({keywordsInput.split("\n").filter(k => k.trim()).length})
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {keywordsInput
+                        .split("\n")
+                        .filter((k) => k.trim())
+                        .map((keyword, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-1 text-xs bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400 rounded font-mono"
+                          >
+                            {keyword.trim()}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="border-t pt-4">
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>

@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   ChevronLeft,
   ChevronRight,
+  Flag,
   Loader2,
   MoreVertical,
   Plus,
   Search,
   Settings,
   Shield,
+  ShieldCheck,
   Tag,
   Trash2,
   UserCheck,
@@ -225,6 +228,20 @@ export function UserManagement() {
     }
   }
 
+  async function handleAssignAdminRole(userId: string) {
+    if (!confirm("Are you sure you want to assign admin role to this user?")) {
+      return;
+    }
+
+    try {
+      await userManagementService.assignAdminRole(userId);
+      loadUsers();
+    } catch (err) {
+      console.error("Failed to assign admin role:", err);
+      alert("Failed to assign admin role");
+    }
+  }
+
   async function handleToggleGroupFlag(group: Group, flagKey: string, enable: boolean) {
     try {
       const newFlags = enable
@@ -261,10 +278,18 @@ export function UserManagement() {
             Manage users, permissions, and groups
           </p>
         </div>
-        <Button variant="outline" onClick={() => setShowManageGroupsModal(true)}>
-          <Settings className="w-4 h-4 mr-2" />
-          Manage Groups
-        </Button>
+        <div className="flex gap-2">
+          <Link to="/admin/users/feature-flags">
+            <Button variant="outline">
+              <Flag className="w-4 h-4 mr-2" />
+              Feature Flags
+            </Button>
+          </Link>
+          <Button variant="outline" onClick={() => setShowManageGroupsModal(true)}>
+            <Settings className="w-4 h-4 mr-2" />
+            Manage Groups
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -381,6 +406,9 @@ export function UserManagement() {
                     Groups
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium">
+                    Feature Flags
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-medium">
                     Role
                   </th>
                   <th className="text-right px-4 py-3 text-sm font-medium">
@@ -458,6 +486,21 @@ export function UserManagement() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
+                        {(() => {
+                          const userFlags = getUserFeatureFlags(user);
+                          return userFlags.length > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs">
+                              <Flag className="w-3 h-3" />
+                              {userFlags.length} flag{userFlags.length !== 1 ? "s" : ""}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              No flags
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-4 py-3">
                         {user.is_admin || user.role === "admin" ? (
                           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 text-xs font-medium">
                             <Shield className="w-3 h-3" />
@@ -531,6 +574,18 @@ export function UserManagement() {
                                   </>
                                 )}
                               </button>
+                              {!(user.is_admin || user.role === "admin") && (
+                                <button
+                                  onClick={() => {
+                                    handleAssignAdminRole(user.id);
+                                    setOpenMenuUserId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent transition-colors text-left text-orange-600"
+                                >
+                                  <ShieldCheck className="w-4 h-4" />
+                                  Assign Admin Role
+                                </button>
+                              )}
                             </div>
                           </>
                         )}

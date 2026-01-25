@@ -2,16 +2,18 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
+  Check,
+  Copy,
   Database,
   Loader2,
-  Plus,
-  RefreshCw,
-  Search,
   MoreHorizontal,
   Pencil,
-  Trash2,
+  Plus,
   Power,
   PowerOff,
+  RefreshCw,
+  Search,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@janhq/interfaces/button";
 import { Input } from "@janhq/interfaces/input";
@@ -32,25 +34,73 @@ import {
 } from "@janhq/interfaces/dropdrawer";
 import { providerManagementService } from "@/services/admin-service";
 
+const PROVIDER_TYPES = [
+  { value: "openai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic" },
+  { value: "google", label: "Google" },
+  { value: "azure", label: "Azure" },
+  { value: "openrouter", label: "OpenRouter" },
+  { value: "ollama", label: "Ollama" },
+  { value: "local", label: "Local" },
+  { value: "custom", label: "Custom" },
+];
+
+const CATEGORIES = [
+  { value: "llm", label: "LLM" },
+  { value: "image", label: "Image" },
+];
+
+interface ProviderFormData {
+  name: string;
+  vendor: string;
+  category: string;
+  base_url: string;
+  endpoints: string;
+  api_key: string;
+  description: string;
+  active: boolean;
+  default_provider_image_generate: boolean;
+  default_provider_image_edit: boolean;
+  auto_enable_new_models: boolean;
+}
+
+const defaultFormData: ProviderFormData = {
+  name: "",
+  vendor: "openai",
+  category: "llm",
+  base_url: "",
+  endpoints: "",
+  api_key: "",
+  description: "",
+  active: true,
+  default_provider_image_generate: false,
+  default_provider_image_edit: false,
+  auto_enable_new_models: false,
+};
+
 export function ProvidersManagement() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [syncingProvider, setSyncingProvider] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Dialog states
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [providerToDelete, setProviderToDelete] = useState<Provider | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [providerToEdit, setProviderToEdit] = useState<Provider | null>(null);
+  const [providerToDelete, setProviderToDelete] = useState<Provider | null>(null);
+  const [providerToSync, setProviderToSync] = useState<Provider | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
-  // Form state for create
-  const [newProvider, setNewProvider] = useState({
-    name: "",
-    api_base: "",
-    api_key: "",
-    type: "openai",
-  });
+  // Form state
+  const [formData, setFormData] = useState<ProviderFormData>(defaultFormData);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadProviders();
@@ -70,13 +120,23 @@ export function ProvidersManagement() {
     }
   }
 
-  async function handleSync(providerId: string) {
+  async function handleSync() {
+    if (!providerToSync) return;
+
     try {
-      setSyncingProvider(providerId);
-      await providerManagementService.syncProvider(providerId);
+      setSyncingProvider(providerToSync.id);
+      const result = await providerManagementService.syncProviderModels(
+        providerToSync.id,
+        formData.auto_enable_new_models
+      );
+      setSyncDialogOpen(false);
+      setProviderToSync(null);
+      setFormData({ ...formData, auto_enable_new_models: false });
+      alert(`Successfully synced ${result.synced_models_count} models`);
       await loadProviders();
     } catch (err) {
       console.error("Failed to sync provider:", err);
+      alert("Failed to sync provider models");
     } finally {
       setSyncingProvider(null);
     }
@@ -90,37 +150,198 @@ export function ProvidersManagement() {
       await loadProviders();
     } catch (err) {
       console.error("Failed to toggle provider status:", err);
+      alert("Failed to update provider status");
     }
   }
 
   async function handleDelete() {
-    if (!providerToDelete) return;
+    if (!providerToDelete || deleteConfirmText !== "Approved") return;
+
     try {
+      setIsSubmitting(true);
       await providerManagementService.deleteProvider(providerToDelete.id);
       setDeleteDialogOpen(false);
       setProviderToDelete(null);
+      setDeleteConfirmText("");
       await loadProviders();
     } catch (err) {
       console.error("Failed to delete provider:", err);
+      alert("Failed to delete provider");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   async function handleCreate() {
+    if (!formData.name || !formData.vendor) return;
+
     try {
-      await providerManagementService.createProvider(newProvider);
+      setIsSubmitting(true);
+
+      // Parse endpoints
+      let endpoints: Endpoint[] = [];
+      if (formData.endpoints.trim()) {
+        try {
+          // Try JSON parse first
+          const parsed = JSON.parse(formData.endpoints);
+          if (Array.isArray(parsed)) {
+            endpoints = parsed;
+          } else {
+            endpoints = [{ url: formData.endpoints }];
+          }
+        } catch {
+          // Fallback: comma-separated URLs
+          endpoints = formData.endpoints
+            .split(",")
+            .map((url) => url.trim())
+            .filter((url) => url)
+            .map((url) => ({ url }));
+        }
+      }
+
+      const createData: Record<string, unknown> = {
+        name: formData.name,
+        vendor: formData.vendor,
+        category: formData.category || undefined,
+        active: formData.active,
+        default_provider_image_generate: formData.default_provider_image_generate,
+        default_provider_image_edit: formData.default_provider_image_edit,
+      };
+
+      if (formData.base_url) {
+        createData.base_url = formData.base_url;
+      }
+      if (endpoints.length > 0) {
+        createData.endpoints = endpoints;
+      }
+      if (formData.api_key) {
+        createData.api_key = formData.api_key;
+      }
+      if (formData.description) {
+        createData.metadata = { description: formData.description };
+      }
+
+      await providerManagementService.createProvider(createData as Parameters<typeof providerManagementService.createProvider>[0]);
       setCreateDialogOpen(false);
-      setNewProvider({ name: "", api_base: "", api_key: "", type: "openai" });
+      resetForm();
       await loadProviders();
     } catch (err) {
       console.error("Failed to create provider:", err);
+      alert("Failed to create provider");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  const filteredProviders = providers.filter(
-    (p) =>
+  async function handleUpdate() {
+    if (!providerToEdit || !formData.name) return;
+
+    try {
+      setIsSubmitting(true);
+
+      // Parse endpoints
+      let endpoints: Endpoint[] | undefined;
+      if (formData.endpoints.trim()) {
+        try {
+          const parsed = JSON.parse(formData.endpoints);
+          if (Array.isArray(parsed)) {
+            endpoints = parsed;
+          } else {
+            endpoints = [{ url: formData.endpoints }];
+          }
+        } catch {
+          endpoints = formData.endpoints
+            .split(",")
+            .map((url) => url.trim())
+            .filter((url) => url)
+            .map((url) => ({ url }));
+        }
+      }
+
+      const updateData: Record<string, unknown> = {
+        name: formData.name,
+        vendor: formData.vendor,
+        category: formData.category || undefined,
+        active: formData.active,
+        default_provider_image_generate: formData.default_provider_image_generate,
+        default_provider_image_edit: formData.default_provider_image_edit,
+      };
+
+      if (formData.base_url) {
+        updateData.base_url = formData.base_url;
+      }
+      if (endpoints && endpoints.length > 0) {
+        updateData.endpoints = endpoints;
+      }
+      if (formData.api_key) {
+        updateData.api_key = formData.api_key;
+      }
+
+      await providerManagementService.updateProvider(
+        providerToEdit.id,
+        updateData as Parameters<typeof providerManagementService.updateProvider>[1]
+      );
+      setEditDialogOpen(false);
+      setProviderToEdit(null);
+      resetForm();
+      await loadProviders();
+    } catch (err) {
+      console.error("Failed to update provider:", err);
+      alert("Failed to update provider");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function resetForm() {
+    setFormData(defaultFormData);
+  }
+
+  function openEditDialog(provider: Provider) {
+    setProviderToEdit(provider);
+    setFormData({
+      name: provider.name,
+      vendor: provider.vendor,
+      category: provider.category || "llm",
+      base_url: provider.base_url || "",
+      endpoints: provider.endpoints
+        ? provider.endpoints.map((e) => e.url).join(", ")
+        : "",
+      api_key: "",
+      description: (provider.metadata as Record<string, string>)?.description || "",
+      active: provider.active,
+      default_provider_image_generate: provider.default_provider_image_generate || false,
+      default_provider_image_edit: provider.default_provider_image_edit || false,
+      auto_enable_new_models: false,
+    });
+    setEditDialogOpen(true);
+  }
+
+  function openSyncDialog(provider: Provider) {
+    setProviderToSync(provider);
+    setFormData({ ...formData, auto_enable_new_models: false });
+    setSyncDialogOpen(true);
+  }
+
+  function copyToClipboard(text: string) {
+    navigator.clipboard.writeText(text);
+    setCopiedId(text);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  // Filter providers
+  const filteredProviders = providers.filter((p) => {
+    const matchesSearch =
       p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.vendor?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      p.vendor?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = !typeFilter || p.vendor?.toLowerCase() === typeFilter.toLowerCase();
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "active" && p.active) ||
+      (statusFilter === "inactive" && !p.active);
+
+    return matchesSearch && matchesType && matchesStatus;
+  });
 
   if (isLoading) {
     return (
@@ -169,8 +390,9 @@ export function ProvidersManagement() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search providers..."
@@ -179,16 +401,75 @@ export function ProvidersManagement() {
             className="pl-9"
           />
         </div>
+
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          <option value="">All Types</option>
+          {PROVIDER_TYPES.map((type) => (
+            <option key={type.value} value={type.value}>
+              {type.label}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex items-center gap-2 border rounded-md p-1">
+          <Button
+            variant={statusFilter === "all" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setStatusFilter("all")}
+          >
+            All
+          </Button>
+          <Button
+            variant={statusFilter === "active" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setStatusFilter("active")}
+          >
+            Active
+          </Button>
+          <Button
+            variant={statusFilter === "inactive" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setStatusFilter("inactive")}
+          >
+            Inactive
+          </Button>
+        </div>
+
         <Button variant="outline" onClick={loadProviders}>
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
         </Button>
+
+        {(searchQuery || typeFilter || statusFilter !== "all") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearchQuery("");
+              setTypeFilter("");
+              setStatusFilter("all");
+            }}
+          >
+            Clear Filters
+          </Button>
+        )}
       </div>
 
+      <div className="text-sm text-muted-foreground">
+        Showing {filteredProviders.length} of {providers.length} providers
+      </div>
+
+      {/* Provider Grid */}
       <div className="grid gap-4">
         {filteredProviders.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            {searchQuery ? "No providers match your search" : "No providers configured"}
+          <div className="text-center py-12 text-muted-foreground border rounded-lg">
+            {searchQuery || typeFilter || statusFilter !== "all"
+              ? "No providers match your filters"
+              : "No providers configured"}
           </div>
         ) : (
           filteredProviders.map((provider) => (
@@ -202,7 +483,7 @@ export function ProvidersManagement() {
                     <Database className="w-6 h-6 text-purple-600" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-lg font-semibold">{provider.name}</h3>
                       <span
                         className={`px-2 py-0.5 text-xs rounded-full ${
@@ -213,18 +494,50 @@ export function ProvidersManagement() {
                       >
                         {provider.active ? "Active" : "Inactive"}
                       </span>
+                      {provider.category && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                          {provider.category.toUpperCase()}
+                        </span>
+                      )}
+                      {provider.default_provider_image_generate && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
+                          Default Image Gen
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
                       Vendor: {provider.vendor}
                     </p>
-                    {provider.api_base && (
-                      <p className="text-sm text-muted-foreground">
-                        API Base: {provider.api_base}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-muted-foreground font-mono">
+                        ID: {provider.id}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(provider.id)}
+                        className="p-0.5 hover:bg-accent rounded transition-colors"
+                        title="Copy ID"
+                      >
+                        {copiedId === provider.id ? (
+                          <Check className="w-3 h-3 text-green-500" />
+                        ) : (
+                          <Copy className="w-3 h-3 text-muted-foreground" />
+                        )}
+                      </button>
+                    </div>
+                    {provider.endpoints && provider.endpoints.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Endpoints: {provider.endpoints.slice(0, 3).map((e) => e.url).join(", ")}
+                        {provider.endpoints.length > 3 && ` +${provider.endpoints.length - 3} more`}
                       </p>
                     )}
-                    {provider.models_count !== undefined && (
-                      <p className="text-sm text-muted-foreground">
-                        Models: {provider.models_count}
+                    {provider.model_count !== undefined && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Models: {provider.model_active_count || 0} active / {provider.model_count} total
+                      </p>
+                    )}
+                    {provider.updated_at && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Updated: {new Date(provider.updated_at).toLocaleDateString()}
                       </p>
                     )}
                   </div>
@@ -233,7 +546,7 @@ export function ProvidersManagement() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleSync(provider.id)}
+                    onClick={() => openSyncDialog(provider)}
                     disabled={syncingProvider === provider.id}
                   >
                     {syncingProvider === provider.id ? (
@@ -250,6 +563,12 @@ export function ProvidersManagement() {
                       </Button>
                     </DropDrawerTrigger>
                     <DropDrawerContent className="w-48">
+                      <DropDrawerItem onClick={() => openEditDialog(provider)}>
+                        <div className="flex gap-2 items-center">
+                          <Pencil className="w-4 h-4" />
+                          <span>Edit</span>
+                        </div>
+                      </DropDrawerItem>
                       <DropDrawerItem onClick={() => handleToggleActive(provider)}>
                         <div className="flex gap-2 items-center">
                           {provider.active ? (
@@ -264,6 +583,7 @@ export function ProvidersManagement() {
                         variant="destructive"
                         onClick={() => {
                           setProviderToDelete(provider);
+                          setDeleteConfirmText("");
                           setDeleteDialogOpen(true);
                         }}
                       >
@@ -281,71 +601,243 @@ export function ProvidersManagement() {
         )}
       </div>
 
-      {/* Create Provider Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Create/Edit Provider Dialog */}
+      <Dialog
+        open={createDialogOpen || editDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateDialogOpen(false);
+            setEditDialogOpen(false);
+            setProviderToEdit(null);
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Provider</DialogTitle>
+            <DialogTitle>
+              {editDialogOpen ? "Edit Provider" : "Add Provider"}
+            </DialogTitle>
             <DialogDescription>
-              Add a new model provider to your configuration.
+              {editDialogOpen
+                ? "Update the provider configuration."
+                : "Add a new model provider to your configuration."}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Name *</label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  placeholder="My Provider"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Vendor *</label>
+                <select
+                  value={formData.vendor}
+                  onChange={(e) =>
+                    setFormData({ ...formData, vendor: e.target.value })
+                  }
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {PROVIDER_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Category</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value })
+                  }
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium">Base URL</label>
+                <Input
+                  value={formData.base_url}
+                  onChange={(e) =>
+                    setFormData({ ...formData, base_url: e.target.value })
+                  }
+                  placeholder="https://api.openai.com/v1"
+                />
+              </div>
+            </div>
+
             <div className="grid gap-2">
-              <label className="text-sm font-medium">Name</label>
-              <Input
-                value={newProvider.name}
+              <label className="text-sm font-medium">Endpoints</label>
+              <textarea
+                value={formData.endpoints}
                 onChange={(e) =>
-                  setNewProvider({ ...newProvider, name: e.target.value })
+                  setFormData({ ...formData, endpoints: e.target.value })
                 }
-                placeholder="My Provider"
+                placeholder="Comma-separated URLs or JSON array"
+                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
+              <p className="text-xs text-muted-foreground">
+                Enter comma-separated URLs or a JSON array of endpoint objects
+              </p>
             </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Type</label>
-              <select
-                value={newProvider.type}
-                onChange={(e) =>
-                  setNewProvider({ ...newProvider, type: e.target.value })
-                }
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="google">Google</option>
-                <option value="azure">Azure</option>
-                <option value="ollama">Ollama</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">API Base URL</label>
-              <Input
-                value={newProvider.api_base}
-                onChange={(e) =>
-                  setNewProvider({ ...newProvider, api_base: e.target.value })
-                }
-                placeholder="https://api.openai.com/v1"
-              />
-            </div>
+
             <div className="grid gap-2">
               <label className="text-sm font-medium">API Key</label>
               <Input
                 type="password"
-                value={newProvider.api_key}
+                value={formData.api_key}
                 onChange={(e) =>
-                  setNewProvider({ ...newProvider, api_key: e.target.value })
+                  setFormData({ ...formData, api_key: e.target.value })
                 }
-                placeholder="sk-..."
+                placeholder={editDialogOpen ? "Leave empty to keep current" : "sk-..."}
               />
+            </div>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Description</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder="Optional description for this provider"
+                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="active"
+                  checked={formData.active}
+                  onChange={(e) =>
+                    setFormData({ ...formData, active: e.target.checked })
+                  }
+                  className="rounded"
+                />
+                <label htmlFor="active" className="text-sm">
+                  Active
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="default_image_gen"
+                  checked={formData.default_provider_image_generate}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      default_provider_image_generate: e.target.checked,
+                    })
+                  }
+                  className="rounded"
+                />
+                <label htmlFor="default_image_gen" className="text-sm">
+                  Default for Image Generation
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="default_image_edit"
+                  checked={formData.default_provider_image_edit}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      default_provider_image_edit: e.target.checked,
+                    })
+                  }
+                  className="rounded"
+                />
+                <label htmlFor="default_image_edit" className="text-sm">
+                  Default for Image Editing
+                </label>
+              </div>
             </div>
           </div>
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleCreate} disabled={!newProvider.name}>
-              Add Provider
+            <Button
+              onClick={editDialogOpen ? handleUpdate : handleCreate}
+              disabled={!formData.name || !formData.vendor || isSubmitting}
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
+              {editDialogOpen ? "Update" : "Add Provider"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sync Dialog */}
+      <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Sync Provider Models</DialogTitle>
+            <DialogDescription>
+              Fetch and synchronize models from{" "}
+              <span className="font-semibold">{providerToSync?.name}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="auto_enable"
+                checked={formData.auto_enable_new_models}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    auto_enable_new_models: e.target.checked,
+                  })
+                }
+                className="rounded"
+              />
+              <label htmlFor="auto_enable" className="text-sm">
+                Auto-enable newly synced models
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              When enabled, new models discovered during sync will be automatically activated.
+            </p>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              onClick={handleSync}
+              disabled={syncingProvider === providerToSync?.id}
+            >
+              {syncingProvider === providerToSync?.id ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Sync Models
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -357,16 +849,35 @@ export function ProvidersManagement() {
           <DialogHeader>
             <DialogTitle>Delete Provider</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete{" "}
-              <span className="font-semibold">{providerToDelete?.name}</span>?
-              This will also remove all associated models.
+              This will permanently delete{" "}
+              <span className="font-semibold">{providerToDelete?.name}</span> and
+              all {providerToDelete?.model_count || 0} associated models. This action
+              cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          <div className="py-4">
+            <label className="text-sm font-medium">
+              Type "Approved" to confirm deletion
+            </label>
+            <Input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Approved"
+              className="mt-2"
+            />
+          </div>
           <DialogFooter>
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteConfirmText !== "Approved" || isSubmitting}
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : null}
               Delete
             </Button>
           </DialogFooter>

@@ -3,6 +3,7 @@ import { useRouter, Link, useLocation } from "@tanstack/react-router";
 import {
   Box,
   FileText,
+  Flag,
   LayoutDashboard,
   Loader2,
   Shield,
@@ -30,6 +31,10 @@ const navItems = [
     title: "User Management",
     href: "/admin/users",
     icon: Users,
+    children: [
+      { title: "Users", href: "/admin/users" },
+      { title: "Feature Flags", href: "/admin/users/feature-flags" },
+    ],
   },
   {
     title: "Model Management",
@@ -125,6 +130,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 {navItems.map((item) => {
                   const isActive =
                     pathname === item.href ||
+                    pathname.startsWith(item.href + "/") ||
                     (item.children &&
                       item.children.some((c) => pathname === c.href));
                   const Icon = item.icon;
