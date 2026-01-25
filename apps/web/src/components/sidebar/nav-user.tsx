@@ -3,7 +3,7 @@ import {
   LogOut,
   SettingsIcon,
   FlagIcon,
-  User,
+  LayoutDashboard,
   Shield,
   BookOpen,
 } from "lucide-react";
@@ -67,8 +67,55 @@ export function NavUser() {
     router.navigate({ to: url.pathname + url.search });
   };
 
+  const isCollapsed = state === "collapsed";
+
   return (
-    <SidebarMenu className={cn(state === "collapsed" && "md:items-center")}>
+    <SidebarMenu className={cn(isCollapsed && "md:items-center", "gap-1")}>
+      {/* Dashboard Button */}
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          tooltip="Dashboard"
+          className="hover:bg-sidebar-accent"
+        >
+          <Link to="/profile" onClick={handleNavigation}>
+            <LayoutDashboard className="size-4" />
+            <span>Dashboard</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      {/* Administrator Button - Only show for admins */}
+      {isAdmin && (
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            asChild
+            tooltip="Administrator"
+            className="hover:bg-sidebar-accent"
+          >
+            <Link to="/admin" onClick={handleNavigation}>
+              <Shield className="size-4" />
+              <span>Administrator</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      )}
+
+      {/* Documentation Button */}
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          asChild
+          tooltip="Documentation"
+          className="hover:bg-sidebar-accent"
+        >
+          <Link to="/docs" onClick={handleNavigation}>
+            <BookOpen className="size-4" />
+            <span>Documentation</span>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+
+      {/* User Dropdown */}
       <SidebarMenuItem>
         <DropDrawer>
           <DropDrawerTrigger asChild>
@@ -83,18 +130,14 @@ export function NavUser() {
                 </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {/* temporary till we have manage billing */}
-                  {/* {user.pro ? 'Pro Plan' : 'Free Plan'} */}
-                </span>
+                <span className="truncate font-medium">{user.email || user.name}</span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropDrawerTrigger>
           <DropDrawerContent
             className="md:w-56"
-            side={state === "collapsed" ? "right" : "top"}
+            side={isCollapsed ? "right" : "top"}
             align="center"
             sideOffset={4}
           >
@@ -108,16 +151,7 @@ export function NavUser() {
                 </div>
               </div>
             </DropDrawerLabel>
-            <DropDrawerItem asChild>
-              <Link
-                to="/profile"
-                onClick={handleNavigation}
-                className="flex gap-2 items-center"
-              >
-                <User className="text-muted-foreground" />
-                Profile & API Keys
-              </Link>
-            </DropDrawerItem>
+            <DropDrawerSeparator />
             <DropDrawerItem
               onClick={() => handleOpenSettings(SETTINGS_SECTION.GENERAL)}
             >
@@ -126,29 +160,6 @@ export function NavUser() {
                 Settings
               </div>
             </DropDrawerItem>
-            <DropDrawerItem asChild>
-              <Link
-                to="/docs"
-                onClick={handleNavigation}
-                className="flex gap-2 items-center"
-              >
-                <BookOpen className="text-muted-foreground" />
-                Documentation
-              </Link>
-            </DropDrawerItem>
-            {isAdmin && (
-              <DropDrawerItem asChild>
-                <Link
-                  to="/admin"
-                  onClick={handleNavigation}
-                  className="flex gap-2 items-center"
-                >
-                  <Shield className="text-muted-foreground" />
-                  Admin Panel
-                </Link>
-              </DropDrawerItem>
-            )}
-            <DropDrawerSeparator />
             <DropDrawerItem asChild>
               <a
                 href={VITE_REPORT_ISSUE_URL}
@@ -160,6 +171,7 @@ export function NavUser() {
                 Report Issue
               </a>
             </DropDrawerItem>
+            <DropDrawerSeparator />
             <DropDrawerItem
               onClick={async () => {
                 await logout();

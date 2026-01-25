@@ -17,15 +17,31 @@ import { Route as ThreadsTemporaryRouteImport } from './routes/threads/temporary
 import { Route as ThreadsConversationIdRouteImport } from './routes/threads/$conversationId'
 import { Route as ShareSlugRouteImport } from './routes/share/$slug'
 import { Route as ProjectsProjectIdRouteImport } from './routes/projects/$projectId'
+import { Route as DocsRoadmapRouteImport } from './routes/docs/roadmap'
 import { Route as DocsQuickstartRouteImport } from './routes/docs/quickstart'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminPromptTemplatesRouteImport } from './routes/admin/prompt-templates'
 import { Route as AdminMcpToolsRouteImport } from './routes/admin/mcp-tools'
 import { Route as DocsGuidesIndexRouteImport } from './routes/docs/guides/index'
+import { Route as DocsConfigurationIndexRouteImport } from './routes/docs/configuration/index'
 import { Route as DocsArchitectureIndexRouteImport } from './routes/docs/architecture/index'
 import { Route as DocsApiIndexRouteImport } from './routes/docs/api/index'
 import { Route as AdminModelsIndexRouteImport } from './routes/admin/models/index'
+import { Route as DocsGuidesTestingRouteImport } from './routes/docs/guides/testing'
+import { Route as DocsGuidesMcpToolsRouteImport } from './routes/docs/guides/mcp-tools'
+import { Route as DocsGuidesDevelopmentRouteImport } from './routes/docs/guides/development'
+import { Route as DocsGuidesDeploymentRouteImport } from './routes/docs/guides/deployment'
+import { Route as DocsConfigurationProvidersRouteImport } from './routes/docs/configuration/providers'
+import { Route as DocsConfigurationModelsRouteImport } from './routes/docs/configuration/models'
+import { Route as DocsConfigurationEnvironmentRouteImport } from './routes/docs/configuration/environment'
+import { Route as DocsArchitectureServicesRouteImport } from './routes/docs/architecture/services'
+import { Route as DocsArchitectureSecurityRouteImport } from './routes/docs/architecture/security'
+import { Route as DocsArchitectureDataFlowRouteImport } from './routes/docs/architecture/data-flow'
+import { Route as DocsApiModelsRouteImport } from './routes/docs/api/models'
+import { Route as DocsApiMessagesRouteImport } from './routes/docs/api/messages'
+import { Route as DocsApiMediaRouteImport } from './routes/docs/api/media'
+import { Route as DocsApiConversationsRouteImport } from './routes/docs/api/conversations'
 import { Route as DocsApiChatCompletionsRouteImport } from './routes/docs/api/chat-completions'
 import { Route as DocsApiAuthenticationRouteImport } from './routes/docs/api/authentication'
 import { Route as AdminModelsProvidersRouteImport } from './routes/admin/models/providers'
@@ -72,6 +88,11 @@ const ProjectsProjectIdRoute = ProjectsProjectIdRouteImport.update({
   path: '/projects/$projectId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsRoadmapRoute = DocsRoadmapRouteImport.update({
+  id: '/docs/roadmap',
+  path: '/docs/roadmap',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocsQuickstartRoute = DocsQuickstartRouteImport.update({
   id: '/docs/quickstart',
   path: '/docs/quickstart',
@@ -102,6 +123,11 @@ const DocsGuidesIndexRoute = DocsGuidesIndexRouteImport.update({
   path: '/docs/guides/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsConfigurationIndexRoute = DocsConfigurationIndexRouteImport.update({
+  id: '/docs/configuration/',
+  path: '/docs/configuration/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocsArchitectureIndexRoute = DocsArchitectureIndexRouteImport.update({
   id: '/docs/architecture/',
   path: '/docs/architecture/',
@@ -115,6 +141,81 @@ const DocsApiIndexRoute = DocsApiIndexRouteImport.update({
 const AdminModelsIndexRoute = AdminModelsIndexRouteImport.update({
   id: '/admin/models/',
   path: '/admin/models/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsGuidesTestingRoute = DocsGuidesTestingRouteImport.update({
+  id: '/docs/guides/testing',
+  path: '/docs/guides/testing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsGuidesMcpToolsRoute = DocsGuidesMcpToolsRouteImport.update({
+  id: '/docs/guides/mcp-tools',
+  path: '/docs/guides/mcp-tools',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsGuidesDevelopmentRoute = DocsGuidesDevelopmentRouteImport.update({
+  id: '/docs/guides/development',
+  path: '/docs/guides/development',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsGuidesDeploymentRoute = DocsGuidesDeploymentRouteImport.update({
+  id: '/docs/guides/deployment',
+  path: '/docs/guides/deployment',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsConfigurationProvidersRoute =
+  DocsConfigurationProvidersRouteImport.update({
+    id: '/docs/configuration/providers',
+    path: '/docs/configuration/providers',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DocsConfigurationModelsRoute = DocsConfigurationModelsRouteImport.update({
+  id: '/docs/configuration/models',
+  path: '/docs/configuration/models',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsConfigurationEnvironmentRoute =
+  DocsConfigurationEnvironmentRouteImport.update({
+    id: '/docs/configuration/environment',
+    path: '/docs/configuration/environment',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DocsArchitectureServicesRoute =
+  DocsArchitectureServicesRouteImport.update({
+    id: '/docs/architecture/services',
+    path: '/docs/architecture/services',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DocsArchitectureSecurityRoute =
+  DocsArchitectureSecurityRouteImport.update({
+    id: '/docs/architecture/security',
+    path: '/docs/architecture/security',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DocsArchitectureDataFlowRoute =
+  DocsArchitectureDataFlowRouteImport.update({
+    id: '/docs/architecture/data-flow',
+    path: '/docs/architecture/data-flow',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const DocsApiModelsRoute = DocsApiModelsRouteImport.update({
+  id: '/docs/api/models',
+  path: '/docs/api/models',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsApiMessagesRoute = DocsApiMessagesRouteImport.update({
+  id: '/docs/api/messages',
+  path: '/docs/api/messages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsApiMediaRoute = DocsApiMediaRouteImport.update({
+  id: '/docs/api/media',
+  path: '/docs/api/media',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsApiConversationsRoute = DocsApiConversationsRouteImport.update({
+  id: '/docs/api/conversations',
+  path: '/docs/api/conversations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsApiChatCompletionsRoute = DocsApiChatCompletionsRouteImport.update({
@@ -151,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/docs/quickstart': typeof DocsQuickstartRoute
+  '/docs/roadmap': typeof DocsRoadmapRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/share/$slug': typeof ShareSlugRoute
   '/threads/$conversationId': typeof ThreadsConversationIdRoute
@@ -163,9 +265,24 @@ export interface FileRoutesByFullPath {
   '/admin/models/providers': typeof AdminModelsProvidersRoute
   '/docs/api/authentication': typeof DocsApiAuthenticationRoute
   '/docs/api/chat-completions': typeof DocsApiChatCompletionsRoute
+  '/docs/api/conversations': typeof DocsApiConversationsRoute
+  '/docs/api/media': typeof DocsApiMediaRoute
+  '/docs/api/messages': typeof DocsApiMessagesRoute
+  '/docs/api/models': typeof DocsApiModelsRoute
+  '/docs/architecture/data-flow': typeof DocsArchitectureDataFlowRoute
+  '/docs/architecture/security': typeof DocsArchitectureSecurityRoute
+  '/docs/architecture/services': typeof DocsArchitectureServicesRoute
+  '/docs/configuration/environment': typeof DocsConfigurationEnvironmentRoute
+  '/docs/configuration/models': typeof DocsConfigurationModelsRoute
+  '/docs/configuration/providers': typeof DocsConfigurationProvidersRoute
+  '/docs/guides/deployment': typeof DocsGuidesDeploymentRoute
+  '/docs/guides/development': typeof DocsGuidesDevelopmentRoute
+  '/docs/guides/mcp-tools': typeof DocsGuidesMcpToolsRoute
+  '/docs/guides/testing': typeof DocsGuidesTestingRoute
   '/admin/models/': typeof AdminModelsIndexRoute
   '/docs/api/': typeof DocsApiIndexRoute
   '/docs/architecture/': typeof DocsArchitectureIndexRoute
+  '/docs/configuration/': typeof DocsConfigurationIndexRoute
   '/docs/guides/': typeof DocsGuidesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -175,6 +292,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/docs/quickstart': typeof DocsQuickstartRoute
+  '/docs/roadmap': typeof DocsRoadmapRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/share/$slug': typeof ShareSlugRoute
   '/threads/$conversationId': typeof ThreadsConversationIdRoute
@@ -187,9 +305,24 @@ export interface FileRoutesByTo {
   '/admin/models/providers': typeof AdminModelsProvidersRoute
   '/docs/api/authentication': typeof DocsApiAuthenticationRoute
   '/docs/api/chat-completions': typeof DocsApiChatCompletionsRoute
+  '/docs/api/conversations': typeof DocsApiConversationsRoute
+  '/docs/api/media': typeof DocsApiMediaRoute
+  '/docs/api/messages': typeof DocsApiMessagesRoute
+  '/docs/api/models': typeof DocsApiModelsRoute
+  '/docs/architecture/data-flow': typeof DocsArchitectureDataFlowRoute
+  '/docs/architecture/security': typeof DocsArchitectureSecurityRoute
+  '/docs/architecture/services': typeof DocsArchitectureServicesRoute
+  '/docs/configuration/environment': typeof DocsConfigurationEnvironmentRoute
+  '/docs/configuration/models': typeof DocsConfigurationModelsRoute
+  '/docs/configuration/providers': typeof DocsConfigurationProvidersRoute
+  '/docs/guides/deployment': typeof DocsGuidesDeploymentRoute
+  '/docs/guides/development': typeof DocsGuidesDevelopmentRoute
+  '/docs/guides/mcp-tools': typeof DocsGuidesMcpToolsRoute
+  '/docs/guides/testing': typeof DocsGuidesTestingRoute
   '/admin/models': typeof AdminModelsIndexRoute
   '/docs/api': typeof DocsApiIndexRoute
   '/docs/architecture': typeof DocsArchitectureIndexRoute
+  '/docs/configuration': typeof DocsConfigurationIndexRoute
   '/docs/guides': typeof DocsGuidesIndexRoute
 }
 export interface FileRoutesById {
@@ -200,6 +333,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/docs/quickstart': typeof DocsQuickstartRoute
+  '/docs/roadmap': typeof DocsRoadmapRoute
   '/projects/$projectId': typeof ProjectsProjectIdRoute
   '/share/$slug': typeof ShareSlugRoute
   '/threads/$conversationId': typeof ThreadsConversationIdRoute
@@ -212,9 +346,24 @@ export interface FileRoutesById {
   '/admin/models/providers': typeof AdminModelsProvidersRoute
   '/docs/api/authentication': typeof DocsApiAuthenticationRoute
   '/docs/api/chat-completions': typeof DocsApiChatCompletionsRoute
+  '/docs/api/conversations': typeof DocsApiConversationsRoute
+  '/docs/api/media': typeof DocsApiMediaRoute
+  '/docs/api/messages': typeof DocsApiMessagesRoute
+  '/docs/api/models': typeof DocsApiModelsRoute
+  '/docs/architecture/data-flow': typeof DocsArchitectureDataFlowRoute
+  '/docs/architecture/security': typeof DocsArchitectureSecurityRoute
+  '/docs/architecture/services': typeof DocsArchitectureServicesRoute
+  '/docs/configuration/environment': typeof DocsConfigurationEnvironmentRoute
+  '/docs/configuration/models': typeof DocsConfigurationModelsRoute
+  '/docs/configuration/providers': typeof DocsConfigurationProvidersRoute
+  '/docs/guides/deployment': typeof DocsGuidesDeploymentRoute
+  '/docs/guides/development': typeof DocsGuidesDevelopmentRoute
+  '/docs/guides/mcp-tools': typeof DocsGuidesMcpToolsRoute
+  '/docs/guides/testing': typeof DocsGuidesTestingRoute
   '/admin/models/': typeof AdminModelsIndexRoute
   '/docs/api/': typeof DocsApiIndexRoute
   '/docs/architecture/': typeof DocsArchitectureIndexRoute
+  '/docs/configuration/': typeof DocsConfigurationIndexRoute
   '/docs/guides/': typeof DocsGuidesIndexRoute
 }
 export interface FileRouteTypes {
@@ -226,6 +375,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/auth/callback'
     | '/docs/quickstart'
+    | '/docs/roadmap'
     | '/projects/$projectId'
     | '/share/$slug'
     | '/threads/$conversationId'
@@ -238,9 +388,24 @@ export interface FileRouteTypes {
     | '/admin/models/providers'
     | '/docs/api/authentication'
     | '/docs/api/chat-completions'
+    | '/docs/api/conversations'
+    | '/docs/api/media'
+    | '/docs/api/messages'
+    | '/docs/api/models'
+    | '/docs/architecture/data-flow'
+    | '/docs/architecture/security'
+    | '/docs/architecture/services'
+    | '/docs/configuration/environment'
+    | '/docs/configuration/models'
+    | '/docs/configuration/providers'
+    | '/docs/guides/deployment'
+    | '/docs/guides/development'
+    | '/docs/guides/mcp-tools'
+    | '/docs/guides/testing'
     | '/admin/models/'
     | '/docs/api/'
     | '/docs/architecture/'
+    | '/docs/configuration/'
     | '/docs/guides/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -250,6 +415,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/auth/callback'
     | '/docs/quickstart'
+    | '/docs/roadmap'
     | '/projects/$projectId'
     | '/share/$slug'
     | '/threads/$conversationId'
@@ -262,9 +428,24 @@ export interface FileRouteTypes {
     | '/admin/models/providers'
     | '/docs/api/authentication'
     | '/docs/api/chat-completions'
+    | '/docs/api/conversations'
+    | '/docs/api/media'
+    | '/docs/api/messages'
+    | '/docs/api/models'
+    | '/docs/architecture/data-flow'
+    | '/docs/architecture/security'
+    | '/docs/architecture/services'
+    | '/docs/configuration/environment'
+    | '/docs/configuration/models'
+    | '/docs/configuration/providers'
+    | '/docs/guides/deployment'
+    | '/docs/guides/development'
+    | '/docs/guides/mcp-tools'
+    | '/docs/guides/testing'
     | '/admin/models'
     | '/docs/api'
     | '/docs/architecture'
+    | '/docs/configuration'
     | '/docs/guides'
   id:
     | '__root__'
@@ -274,6 +455,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/auth/callback'
     | '/docs/quickstart'
+    | '/docs/roadmap'
     | '/projects/$projectId'
     | '/share/$slug'
     | '/threads/$conversationId'
@@ -286,9 +468,24 @@ export interface FileRouteTypes {
     | '/admin/models/providers'
     | '/docs/api/authentication'
     | '/docs/api/chat-completions'
+    | '/docs/api/conversations'
+    | '/docs/api/media'
+    | '/docs/api/messages'
+    | '/docs/api/models'
+    | '/docs/architecture/data-flow'
+    | '/docs/architecture/security'
+    | '/docs/architecture/services'
+    | '/docs/configuration/environment'
+    | '/docs/configuration/models'
+    | '/docs/configuration/providers'
+    | '/docs/guides/deployment'
+    | '/docs/guides/development'
+    | '/docs/guides/mcp-tools'
+    | '/docs/guides/testing'
     | '/admin/models/'
     | '/docs/api/'
     | '/docs/architecture/'
+    | '/docs/configuration/'
     | '/docs/guides/'
   fileRoutesById: FileRoutesById
 }
@@ -299,6 +496,7 @@ export interface RootRouteChildren {
   AdminUsersRoute: typeof AdminUsersRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   DocsQuickstartRoute: typeof DocsQuickstartRoute
+  DocsRoadmapRoute: typeof DocsRoadmapRoute
   ProjectsProjectIdRoute: typeof ProjectsProjectIdRoute
   ShareSlugRoute: typeof ShareSlugRoute
   ThreadsConversationIdRoute: typeof ThreadsConversationIdRoute
@@ -311,9 +509,24 @@ export interface RootRouteChildren {
   AdminModelsProvidersRoute: typeof AdminModelsProvidersRoute
   DocsApiAuthenticationRoute: typeof DocsApiAuthenticationRoute
   DocsApiChatCompletionsRoute: typeof DocsApiChatCompletionsRoute
+  DocsApiConversationsRoute: typeof DocsApiConversationsRoute
+  DocsApiMediaRoute: typeof DocsApiMediaRoute
+  DocsApiMessagesRoute: typeof DocsApiMessagesRoute
+  DocsApiModelsRoute: typeof DocsApiModelsRoute
+  DocsArchitectureDataFlowRoute: typeof DocsArchitectureDataFlowRoute
+  DocsArchitectureSecurityRoute: typeof DocsArchitectureSecurityRoute
+  DocsArchitectureServicesRoute: typeof DocsArchitectureServicesRoute
+  DocsConfigurationEnvironmentRoute: typeof DocsConfigurationEnvironmentRoute
+  DocsConfigurationModelsRoute: typeof DocsConfigurationModelsRoute
+  DocsConfigurationProvidersRoute: typeof DocsConfigurationProvidersRoute
+  DocsGuidesDeploymentRoute: typeof DocsGuidesDeploymentRoute
+  DocsGuidesDevelopmentRoute: typeof DocsGuidesDevelopmentRoute
+  DocsGuidesMcpToolsRoute: typeof DocsGuidesMcpToolsRoute
+  DocsGuidesTestingRoute: typeof DocsGuidesTestingRoute
   AdminModelsIndexRoute: typeof AdminModelsIndexRoute
   DocsApiIndexRoute: typeof DocsApiIndexRoute
   DocsArchitectureIndexRoute: typeof DocsArchitectureIndexRoute
+  DocsConfigurationIndexRoute: typeof DocsConfigurationIndexRoute
   DocsGuidesIndexRoute: typeof DocsGuidesIndexRoute
 }
 
@@ -375,6 +588,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs/roadmap': {
+      id: '/docs/roadmap'
+      path: '/docs/roadmap'
+      fullPath: '/docs/roadmap'
+      preLoaderRoute: typeof DocsRoadmapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/docs/quickstart': {
       id: '/docs/quickstart'
       path: '/docs/quickstart'
@@ -417,6 +637,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsGuidesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs/configuration/': {
+      id: '/docs/configuration/'
+      path: '/docs/configuration'
+      fullPath: '/docs/configuration/'
+      preLoaderRoute: typeof DocsConfigurationIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/docs/architecture/': {
       id: '/docs/architecture/'
       path: '/docs/architecture'
@@ -436,6 +663,104 @@ declare module '@tanstack/react-router' {
       path: '/admin/models'
       fullPath: '/admin/models/'
       preLoaderRoute: typeof AdminModelsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/guides/testing': {
+      id: '/docs/guides/testing'
+      path: '/docs/guides/testing'
+      fullPath: '/docs/guides/testing'
+      preLoaderRoute: typeof DocsGuidesTestingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/guides/mcp-tools': {
+      id: '/docs/guides/mcp-tools'
+      path: '/docs/guides/mcp-tools'
+      fullPath: '/docs/guides/mcp-tools'
+      preLoaderRoute: typeof DocsGuidesMcpToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/guides/development': {
+      id: '/docs/guides/development'
+      path: '/docs/guides/development'
+      fullPath: '/docs/guides/development'
+      preLoaderRoute: typeof DocsGuidesDevelopmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/guides/deployment': {
+      id: '/docs/guides/deployment'
+      path: '/docs/guides/deployment'
+      fullPath: '/docs/guides/deployment'
+      preLoaderRoute: typeof DocsGuidesDeploymentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/configuration/providers': {
+      id: '/docs/configuration/providers'
+      path: '/docs/configuration/providers'
+      fullPath: '/docs/configuration/providers'
+      preLoaderRoute: typeof DocsConfigurationProvidersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/configuration/models': {
+      id: '/docs/configuration/models'
+      path: '/docs/configuration/models'
+      fullPath: '/docs/configuration/models'
+      preLoaderRoute: typeof DocsConfigurationModelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/configuration/environment': {
+      id: '/docs/configuration/environment'
+      path: '/docs/configuration/environment'
+      fullPath: '/docs/configuration/environment'
+      preLoaderRoute: typeof DocsConfigurationEnvironmentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/architecture/services': {
+      id: '/docs/architecture/services'
+      path: '/docs/architecture/services'
+      fullPath: '/docs/architecture/services'
+      preLoaderRoute: typeof DocsArchitectureServicesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/architecture/security': {
+      id: '/docs/architecture/security'
+      path: '/docs/architecture/security'
+      fullPath: '/docs/architecture/security'
+      preLoaderRoute: typeof DocsArchitectureSecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/architecture/data-flow': {
+      id: '/docs/architecture/data-flow'
+      path: '/docs/architecture/data-flow'
+      fullPath: '/docs/architecture/data-flow'
+      preLoaderRoute: typeof DocsArchitectureDataFlowRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/api/models': {
+      id: '/docs/api/models'
+      path: '/docs/api/models'
+      fullPath: '/docs/api/models'
+      preLoaderRoute: typeof DocsApiModelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/api/messages': {
+      id: '/docs/api/messages'
+      path: '/docs/api/messages'
+      fullPath: '/docs/api/messages'
+      preLoaderRoute: typeof DocsApiMessagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/api/media': {
+      id: '/docs/api/media'
+      path: '/docs/api/media'
+      fullPath: '/docs/api/media'
+      preLoaderRoute: typeof DocsApiMediaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/api/conversations': {
+      id: '/docs/api/conversations'
+      path: '/docs/api/conversations'
+      fullPath: '/docs/api/conversations'
+      preLoaderRoute: typeof DocsApiConversationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/api/chat-completions': {
@@ -483,6 +808,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminUsersRoute: AdminUsersRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   DocsQuickstartRoute: DocsQuickstartRoute,
+  DocsRoadmapRoute: DocsRoadmapRoute,
   ProjectsProjectIdRoute: ProjectsProjectIdRoute,
   ShareSlugRoute: ShareSlugRoute,
   ThreadsConversationIdRoute: ThreadsConversationIdRoute,
@@ -495,9 +821,24 @@ const rootRouteChildren: RootRouteChildren = {
   AdminModelsProvidersRoute: AdminModelsProvidersRoute,
   DocsApiAuthenticationRoute: DocsApiAuthenticationRoute,
   DocsApiChatCompletionsRoute: DocsApiChatCompletionsRoute,
+  DocsApiConversationsRoute: DocsApiConversationsRoute,
+  DocsApiMediaRoute: DocsApiMediaRoute,
+  DocsApiMessagesRoute: DocsApiMessagesRoute,
+  DocsApiModelsRoute: DocsApiModelsRoute,
+  DocsArchitectureDataFlowRoute: DocsArchitectureDataFlowRoute,
+  DocsArchitectureSecurityRoute: DocsArchitectureSecurityRoute,
+  DocsArchitectureServicesRoute: DocsArchitectureServicesRoute,
+  DocsConfigurationEnvironmentRoute: DocsConfigurationEnvironmentRoute,
+  DocsConfigurationModelsRoute: DocsConfigurationModelsRoute,
+  DocsConfigurationProvidersRoute: DocsConfigurationProvidersRoute,
+  DocsGuidesDeploymentRoute: DocsGuidesDeploymentRoute,
+  DocsGuidesDevelopmentRoute: DocsGuidesDevelopmentRoute,
+  DocsGuidesMcpToolsRoute: DocsGuidesMcpToolsRoute,
+  DocsGuidesTestingRoute: DocsGuidesTestingRoute,
   AdminModelsIndexRoute: AdminModelsIndexRoute,
   DocsApiIndexRoute: DocsApiIndexRoute,
   DocsArchitectureIndexRoute: DocsArchitectureIndexRoute,
+  DocsConfigurationIndexRoute: DocsConfigurationIndexRoute,
   DocsGuidesIndexRoute: DocsGuidesIndexRoute,
 }
 export const routeTree = rootRouteImport
