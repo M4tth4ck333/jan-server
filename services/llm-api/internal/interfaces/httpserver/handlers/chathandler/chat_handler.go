@@ -18,6 +18,7 @@ import (
 	domainmodel "jan-server/services/llm-api/internal/domain/model"
 	"jan-server/services/llm-api/internal/domain/project"
 	"jan-server/services/llm-api/internal/domain/prompt"
+	"jan-server/services/llm-api/internal/domain/tokenusage"
 	"jan-server/services/llm-api/internal/domain/usersettings"
 	"jan-server/services/llm-api/internal/infrastructure/inference"
 	memclient "jan-server/services/llm-api/internal/infrastructure/memory"
@@ -54,6 +55,7 @@ type ChatHandler struct {
 	promptProcessor     *prompt.ProcessorImpl
 	memoryHandler       *MemoryHandler
 	userSettingsService *usersettings.Service
+	tokenUsageService   *tokenusage.Service
 }
 
 // NewChatHandler creates a new chat handler
@@ -66,6 +68,7 @@ func NewChatHandler(
 	promptProcessor *prompt.ProcessorImpl,
 	memoryHandler *MemoryHandler,
 	userSettingsService *usersettings.Service,
+	tokenUsageService *tokenusage.Service,
 ) *ChatHandler {
 	return &ChatHandler{
 		inferenceProvider:   inferenceProvider,
@@ -76,6 +79,7 @@ func NewChatHandler(
 		promptProcessor:     promptProcessor,
 		memoryHandler:       memoryHandler,
 		userSettingsService: userSettingsService,
+		tokenUsageService:   tokenUsageService,
 	}
 }
 
@@ -209,7 +213,9 @@ func (h *ChatHandler) CreateChatCompletion(
 
 	// Check if we should use the instruct model instead
 	// This happens when enable_thinking is explicitly false and the model has an instruct model configured
-	if request.EnableThinking != nil && !*request.EnableThinking && selectedProviderModel.InstructModelID != nil && !imageRequested {
+	// Skip instruct fallback for API key authentication (API users should get the model they requested)
+	isAPIKeyAuth := strings.EqualFold(reqCtx.GetHeader("X-Auth-Method"), "apikey")
+	if !isAPIKeyAuth && request.EnableThinking != nil && !*request.EnableThinking && selectedProviderModel.InstructModelID != nil && !imageRequested {
 		instructModel, instructProvider, err := h.providerHandler.GetProviderModelByID(ctx, *selectedProviderModel.InstructModelID)
 		if err == nil && instructModel != nil && instructProvider != nil {
 			observability.AddSpanEvent(ctx, "switching_to_instruct_model",
@@ -219,6 +225,8 @@ func (h *ChatHandler) CreateChatCompletion(
 			selectedProviderModel = instructModel
 			selectedProvider = instructProvider
 		}
+	} else if isAPIKeyAuth && request.EnableThinking != nil && !*request.EnableThinking && selectedProviderModel.InstructModelID != nil {
+		observability.AddSpanEvent(ctx, "skipping_instruct_fallback_for_api_key_auth")
 	}
 
 	// Add provider information to span
@@ -444,6 +452,36 @@ func (h *ChatHandler) CreateChatCompletion(
 		// Record Prometheus metrics for token usage and LLM duration
 		metrics.RecordTokens(request.Model, selectedProvider.DisplayName, response.Usage.PromptTokens, response.Usage.CompletionTokens)
 		metrics.RecordLLMDuration(request.Model, selectedProvider.DisplayName, request.Stream, llmDuration.Seconds())
+
+		// Record token usage to database for user dashboard
+		if h.tokenUsageService != nil {
+			usage := &tokenusage.TokenUsage{
+				UserID:           fmt.Sprintf("%d", userID),
+				Model:            request.Model,
+				Provider:         selectedProvider.DisplayName,
+				PromptTokens:     response.Usage.PromptTokens,
+				CompletionTokens: response.Usage.CompletionTokens,
+				TotalTokens:      response.Usage.TotalTokens,
+				Stream:           request.Stream,
+			}
+			// Add conversation ID if available
+			if conversationID != "" {
+				usage.ConversationID = &conversationID
+			}
+			// Add project ID if available from conversation
+			if conv != nil && conv.ProjectPublicID != nil {
+				usage.ProjectID = conv.ProjectPublicID
+			}
+			// Record usage asynchronously to not block the response
+			go func(ctx context.Context, u *tokenusage.TokenUsage) {
+				if err := h.tokenUsageService.RecordUsage(ctx, u); err != nil {
+					// Log error but don't fail the request
+					observability.AddSpanEvent(ctx, "token_usage_recording_failed",
+						attribute.String("error", err.Error()),
+					)
+				}
+			}(context.Background(), usage)
+		}
 	}
 
 	// Add request and response to conversation if conversation context was provided

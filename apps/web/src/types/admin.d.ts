@@ -227,8 +227,8 @@ interface EffectiveTemplatesResponse {
   templates: Record<string, EffectiveTemplate>;
 }
 
-// MCP Tool Types
-interface MCPTool {
+// MCP Tool Types (Admin management - different from MCP SDK tool in mcp.d.ts)
+interface AdminMCPTool {
   id: string;
   public_id: string;
   tool_key: string;
@@ -244,7 +244,7 @@ interface MCPTool {
   updated_by?: string;
 }
 
-interface UpdateMCPToolRequest {
+interface UpdateAdminMCPToolRequest {
   description?: string;
   category?: string;
   is_active?: boolean;
@@ -297,4 +297,44 @@ interface CreateApiKeyResponse {
 
 interface ListApiKeysResponse {
   items: ApiKey[];
+}
+
+// Usage Types
+interface UsageSummary {
+  model: string;
+  provider: string;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  request_count: number;
+  estimated_cost_usd: string;
+}
+
+interface UsagePeriod {
+  start_date: string;
+  end_date: string;
+}
+
+interface UsageResponse {
+  period: UsagePeriod;
+  total_usage: UsageSummary;
+  by_model: UsageSummary[];
+  by_provider: UsageSummary[];
+}
+
+interface ActivityBucket {
+  bucket_time: string;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  request_count: number;
+}
+
+interface DailyAggregate {
+  date: string;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  request_count: number;
+  estimated_cost_usd: string;
 }
