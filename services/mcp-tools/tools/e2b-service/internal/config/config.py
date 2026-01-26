@@ -1,6 +1,8 @@
 """Configuration settings for e2b-api."""
 
-from pydantic import computed_field
+import re
+
+from pydantic import computed_field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -55,6 +57,29 @@ class Settings(BaseSettings):
 
     # MCP Proxy Configuration (inside sandbox)
     mcp_proxy_port: int = 17390  # HTTP port for mcp-proxy inside sandbox
+
+    @field_validator(
+        "e2b_sandbox_timeout",
+        "sandbox_max_runtime",
+        "sandbox_max_pause",
+        mode="before",
+    )
+    @classmethod
+    def _parse_duration_seconds(cls, value):
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            raw = value.strip().lower()
+            if raw.isdigit():
+                return int(raw)
+            matches = re.findall(r"(\d+)\s*([smhd])", raw)
+            if matches:
+                total = 0
+                units = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+                for number, unit in matches:
+                    total += int(number) * units[unit]
+                return total
+        return int(value)
 
 
 settings = Settings()

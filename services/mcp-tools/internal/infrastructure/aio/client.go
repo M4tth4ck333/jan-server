@@ -302,19 +302,16 @@ func (c *Client) FileList(ctx context.Context, path string) ([]sandboxdomain.Fil
 	}
 
 	files := make([]sandboxdomain.FileInfo, 0)
-	if result.Data.Entries != nil {
-		for _, entry := range *result.Data.Entries {
-			var name string
-			var isDir bool
+	if result.Data != nil && len(result.Data.Files) > 0 {
+		for _, entry := range result.Data.Files {
+			if entry == nil {
+				continue
+			}
+			name := entry.Name
+			isDir := entry.IsDirectory
 			var size int64
-			if entry.Name != nil {
-				name = *entry.Name
-			}
-			if entry.IsDir != nil {
-				isDir = *entry.IsDir
-			}
 			if entry.Size != nil {
-				size = *entry.Size
+				size = int64(*entry.Size)
 			}
 			files = append(files, sandboxdomain.FileInfo{
 				Name:  name,

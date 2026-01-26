@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	sandboxdomain "jan-server/services/mcp-tools/internal/domain/sandbox"
@@ -524,6 +525,38 @@ func (c *Client) EnsureSandboxRunning(ctx context.Context, userID string) error 
 	}
 
 	c.userID = userID
+	return nil
+}
+
+// EnsureWorkspace ensures a sandbox and workspace exist for the given user and conversation.
+func (c *Client) EnsureWorkspace(ctx context.Context, userID, conversationID string) error {
+	if !c.IsEnabled() {
+		return fmt.Errorf("e2b client not enabled")
+	}
+	if strings.TrimSpace(userID) == "" || strings.TrimSpace(conversationID) == "" {
+		return fmt.Errorf("user_id and conversation_id are required")
+	}
+
+	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox/workspace/%s", c.baseURL, userID, conversationID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ensure workspace failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	c.userID = userID
+	c.convID = conversationID
 	return nil
 }
 

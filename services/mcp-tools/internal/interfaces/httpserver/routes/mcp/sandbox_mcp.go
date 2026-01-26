@@ -3,9 +3,11 @@ package mcp
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"jan-server/services/mcp-tools/internal/domain/sandbox"
@@ -21,6 +23,18 @@ import (
 type SandboxMCP struct {
 	provider  sandbox.Provider
 	llmClient *llmapi.Client
+}
+
+type sandboxContextSetter interface {
+	SetContext(userID, conversationID string)
+}
+
+type sandboxRunner interface {
+	EnsureSandboxRunning(ctx context.Context, userID string) error
+}
+
+type sandboxWorkspaceRunner interface {
+	EnsureWorkspace(ctx context.Context, userID, conversationID string) error
 }
 
 // NewSandboxMCP creates a new Sandbox MCP handler
@@ -46,6 +60,51 @@ func (s *SandboxMCP) ProviderName() string {
 		return ""
 	}
 	return s.provider.Name()
+}
+
+func (s *SandboxMCP) setProviderContext(ctx context.Context, req *mcpsdk.CallToolRequest) {
+	if s == nil || s.provider == nil {
+		return
+	}
+
+	setter, ok := s.provider.(sandboxContextSetter)
+	if !ok {
+		return
+	}
+
+	callCtx := extractAllContext(req)
+	userID := callCtx["user_id"]
+	conversationID := callCtx["conversation_id"]
+
+	if conversationID == "" && ctx != nil {
+		if tracking, ok := GetToolTracking(ctx); ok {
+			conversationID = tracking.ConversationID
+		}
+	}
+
+	if userID == "" && ctx != nil {
+		if val := ctx.Value("user_id"); val != nil {
+			if str, ok := val.(string); ok {
+				userID = str
+			}
+		}
+	}
+
+	if userID == "" && conversationID == "" {
+		return
+	}
+
+	if runner, ok := s.provider.(sandboxWorkspaceRunner); ok && userID != "" && conversationID != "" {
+		if err := runner.EnsureWorkspace(ctx, userID, conversationID); err != nil {
+			log.Warn().Err(err).Str("provider", s.provider.Name()).Msg("Failed to ensure sandbox workspace")
+		}
+	} else if runner, ok := s.provider.(sandboxRunner); ok && userID != "" {
+		if err := runner.EnsureSandboxRunning(ctx, userID); err != nil {
+			log.Warn().Err(err).Str("provider", s.provider.Name()).Msg("Failed to ensure sandbox running")
+		}
+	}
+
+	setter.SetContext(userID, conversationID)
 }
 
 // RegisterTools registers sandbox tools with the MCP server
@@ -96,6 +155,7 @@ func (s *SandboxMCP) registerShellExec(server *mcpsdk.Server) {
 		Name:        "sandbox_shell_exec",
 		Description: "Execute shell commands in the sandbox. Returns stdout, stderr, and exit code. Use for file operations, system commands, and automation tasks.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxShellExecArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 		callCtx := extractAllContext(req)
 
@@ -147,6 +207,7 @@ func (s *SandboxMCP) registerFileRead(server *mcpsdk.Server) {
 		Name:        "sandbox_file_read",
 		Description: "Read file contents from sandbox filesystem. Provide the path to the file.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxFileReadArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -185,6 +246,7 @@ func (s *SandboxMCP) registerFileWrite(server *mcpsdk.Server) {
 		Name:        "sandbox_file_write",
 		Description: "Write content to a file in sandbox filesystem. Creates parent directories if needed.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxFileWriteArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -230,6 +292,7 @@ func (s *SandboxMCP) registerFileList(server *mcpsdk.Server) {
 		Name:        "sandbox_file_list",
 		Description: "List files and directories in sandbox filesystem. Returns file names, sizes, and types.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxFileListArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -271,6 +334,7 @@ func (s *SandboxMCP) registerCodeExecute(server *mcpsdk.Server) {
 		Name:        "sandbox_code_execute",
 		Description: "Execute Python or Node.js code in sandbox. Set language to 'python' or 'nodejs'. Returns stdout, stderr, and execution results.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxCodeExecuteArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 		callCtx := extractAllContext(req)
 
@@ -370,6 +434,7 @@ func (s *SandboxMCP) registerInstallPackages(server *mcpsdk.Server) {
 		Name:        "sandbox_install_packages",
 		Description: "Install packages using pip (Python) or npm (Node.js) in the sandbox. Use this before running code that requires external libraries.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxInstallPackagesArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 		callCtx := extractAllContext(req)
 
@@ -479,6 +544,7 @@ func (s *SandboxMCP) registerMarkitdownConvert(server *mcpsdk.Server) {
 		Name:        "sandbox_markitdown_convert",
 		Description: "Convert a URL or document to Markdown format. Useful for extracting readable text from web pages.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxMarkitdownConvertArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -514,6 +580,7 @@ func (s *SandboxMCP) registerBrowserInfo(server *mcpsdk.Server) {
 		Name:        "sandbox_browser_info",
 		Description: "Get browser information from sandbox including CDP URL for automation.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input struct{}) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -554,6 +621,7 @@ func (s *SandboxMCP) registerScreenshot(server *mcpsdk.Server) {
 		Name:        "sandbox_screenshot",
 		Description: "Take a screenshot of the sandbox desktop. Returns base64-encoded PNG image.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input struct{}) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -574,9 +642,19 @@ func (s *SandboxMCP) registerScreenshot(server *mcpsdk.Server) {
 			return nil, nil, fmt.Errorf("screenshot failed: %w", err)
 		}
 
+		imageData, err := decodeSandboxImage(result)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Str("tool", "sandbox_screenshot").
+				Str("provider", providerName).
+				Msg("Screenshot decode failed")
+			return nil, nil, fmt.Errorf("screenshot decode failed: %w", err)
+		}
+
 		return &mcpsdk.CallToolResult{
 			Content: []mcpsdk.Content{&mcpsdk.ImageContent{
-				Data:     result,
+				Data:     imageData,
 				MIMEType: "image/png",
 			}},
 		}, nil, nil
@@ -595,6 +673,7 @@ func (s *SandboxMCP) registerClick(server *mcpsdk.Server) {
 		Name:        "sandbox_click",
 		Description: "Perform a mouse click at coordinates in the sandbox.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxClickArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -646,6 +725,7 @@ func (s *SandboxMCP) registerType(server *mcpsdk.Server) {
 		Name:        "sandbox_type",
 		Description: "Type text in the sandbox.",
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxTypeArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
+		s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -690,4 +770,27 @@ func truncateSandboxString(s string, maxLen int) string {
 func hashSandboxString(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
+}
+
+func decodeSandboxImage(data string) ([]byte, error) {
+	trimmed := strings.TrimSpace(data)
+	if trimmed == "" {
+		return nil, fmt.Errorf("empty image data")
+	}
+
+	if strings.HasPrefix(trimmed, "data:") {
+		if comma := strings.Index(trimmed, ","); comma != -1 {
+			trimmed = trimmed[comma+1:]
+		}
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(trimmed)
+	if err != nil {
+		decoded, err = base64.RawStdEncoding.DecodeString(trimmed)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return decoded, nil
 }

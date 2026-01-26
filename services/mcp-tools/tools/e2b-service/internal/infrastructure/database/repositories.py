@@ -88,9 +88,11 @@ class PostgresSandboxRepository(SandboxRepository):
     async def get_by_user_id(self, user_id: str) -> SandboxRecord | None:
         """Get sandbox by user ID (one sandbox per user)."""
         result = await self._session.execute(
-            select(SandboxModel).where(SandboxModel.user_id == user_id)
+            select(SandboxModel)
+            .where(SandboxModel.user_id == user_id)
+            .order_by(SandboxModel.created_at.desc())
         )
-        model = result.scalar_one_or_none()
+        model = result.scalars().first()
         return _sandbox_model_to_entity(model) if model else None
 
     async def update(self, sandbox: SandboxRecord) -> SandboxRecord:

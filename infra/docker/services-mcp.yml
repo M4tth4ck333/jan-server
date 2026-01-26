@@ -222,8 +222,10 @@ services:
     networks:
       - mcp-network
       - default
+    ports:
+      - "${E2B_SERVICE_PORT:-8095}:8095"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8095/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:8095/health"]
       interval: 30s
       timeout: 10s
       retries: 3

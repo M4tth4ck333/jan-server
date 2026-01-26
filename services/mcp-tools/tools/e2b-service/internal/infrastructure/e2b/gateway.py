@@ -340,8 +340,14 @@ class E2BGateway(SandboxGateway):
             raise ValueError(f"Sandbox {sandbox_id} not found")
 
         try:
-            sandbox.click(x=x, y=y, button=button)
-            return InputResult(status="clicked", x=x, y=y, button=button)
+            btn = (button or "left").lower()
+            if btn == "right":
+                sandbox.right_click(x=x, y=y)
+            elif btn == "middle":
+                sandbox.middle_click(x=x, y=y)
+            else:
+                sandbox.left_click(x=x, y=y)
+            return InputResult(status="clicked", x=x, y=y, button=btn)
         except Exception as e:
             logger.error(f"Mouse click error in {sandbox_id}: {e}")
             raise
