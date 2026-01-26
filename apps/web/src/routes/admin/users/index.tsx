@@ -13,6 +13,6 @@ function AdminUsersIndexRoute() {
   );
 }
 
-export const Route = createFileRoute("/admin/users/")({
+export const Route = createFileRoute("/admin/users/" as "/admin/users")({
   component: AdminUsersIndexRoute,
 });

@@ -67,13 +67,16 @@ export const MessageItem = memo(
     status,
     reasoningContainerRef,
     onRegenerate,
-    conversationId,
+    conversationId: _conversationId,
   }: MessageItemProps) => {
     const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
     const [previewImage, setPreviewImage] = useState<{
       url: string;
       filename?: string;
     } | null>(null);
+
+    // Resolver function for media URLs - returns the URL as-is
+    const mediaResolver = async (input: string): Promise<string> => input;
 
     const handleCopy = (text: string) => {
       navigator.clipboard.writeText(text.trim());
@@ -319,6 +322,7 @@ export const MessageItem = memo(
                 isAssistant && "size-64", // Bigger for assistant (size-64 = 16rem = 256px vs size-24 = 6rem = 96px)
                 isImage && !isLoading && displayUrl && "cursor-pointer",
               )}
+              resolver={mediaResolver}
               onClick={() => {
                 if (isImage && displayUrl && !isLoading) {
                   setPreviewImage({
@@ -473,12 +477,14 @@ export const MessageItem = memo(
               <ToolOutput
                 output={part.output}
                 errorText={"errorText" in part ? part.errorText : undefined}
+                resolver={mediaResolver}
               />
             )}
             {part.state === TOOL_STATE.OUTPUT_ERROR && (
               <ToolOutput
                 output={undefined}
                 errorText={"errorText" in part ? part.errorText : undefined}
+                resolver={mediaResolver}
               />
             )}
           </ToolContent>
