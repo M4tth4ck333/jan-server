@@ -237,7 +237,7 @@ export function ThreadPageContent({
 
       const textParts =
         message.parts?.filter(
-          (part) =>
+          (part): part is typeof part & { text: string } =>
             part.type === CONTENT_TYPE.TEXT &&
             "text" in part &&
             typeof part.text === "string",

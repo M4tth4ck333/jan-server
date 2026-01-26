@@ -213,7 +213,9 @@ func (h *ChatHandler) CreateChatCompletion(
 
 	// Check if we should use the instruct model instead
 	// This happens when enable_thinking is explicitly false and the model has an instruct model configured
-	if request.EnableThinking != nil && !*request.EnableThinking && selectedProviderModel.InstructModelID != nil && !imageRequested {
+	// Skip instruct fallback for API key authentication (API users should get the model they requested)
+	isAPIKeyAuth := strings.EqualFold(reqCtx.GetHeader("X-Auth-Method"), "apikey")
+	if !isAPIKeyAuth && request.EnableThinking != nil && !*request.EnableThinking && selectedProviderModel.InstructModelID != nil && !imageRequested {
 		instructModel, instructProvider, err := h.providerHandler.GetProviderModelByID(ctx, *selectedProviderModel.InstructModelID)
 		if err == nil && instructModel != nil && instructProvider != nil {
 			observability.AddSpanEvent(ctx, "switching_to_instruct_model",
@@ -223,6 +225,8 @@ func (h *ChatHandler) CreateChatCompletion(
 			selectedProviderModel = instructModel
 			selectedProvider = instructProvider
 		}
+	} else if isAPIKeyAuth && request.EnableThinking != nil && !*request.EnableThinking && selectedProviderModel.InstructModelID != nil {
+		observability.AddSpanEvent(ctx, "skipping_instruct_fallback_for_api_key_auth")
 	}
 
 	// Add provider information to span

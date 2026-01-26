@@ -145,20 +145,18 @@ function filterBase64FromMessages(messages: CoreMessage[]): CoreMessage[] {
 export class CustomChatTransport implements ChatTransport<UIMessage> {
   private model: LanguageModel;
   private tools: Record<string, Tool> = {};
-  private enabledSearch = false;
   private enableBrowse = false;
   private enableImageTools = false;
   private enableAgentMode = false;
 
   constructor(
     model: LanguageModel,
-    enabledSearch?: boolean,
+    _enabledSearch?: boolean, // Reserved for future use
     enableBrowse?: boolean,
     enableImageTools?: boolean,
     enableAgentMode?: boolean,
   ) {
     this.model = model;
-    this.enabledSearch = enabledSearch ?? false;
     this.enableBrowse = enableBrowse ?? false;
     this.enableImageTools = enableImageTools ?? false;
     this.enableAgentMode = enableAgentMode ?? false;
@@ -169,8 +167,8 @@ export class CustomChatTransport implements ChatTransport<UIMessage> {
     this.model = model;
   }
 
-  updateSearchEnabled(enabledSearch: boolean) {
-    this.enabledSearch = enabledSearch;
+  updateSearchEnabled(_enabledSearch: boolean) {
+    // Reserved for future use
   }
   updateBrowseEnabled(enableBrowse: boolean) {
     this.enableBrowse = enableBrowse;

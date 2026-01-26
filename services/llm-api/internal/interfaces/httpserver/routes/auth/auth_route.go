@@ -66,6 +66,7 @@ func (a *AuthRoute) RegisterRouter(router gin.IRouter, protectedRouter gin.IRout
 	protectedRouter.POST("/auth/api-keys", a.authHandler.WithAppUserAuthChain(a.CreateAPIKey)...)
 	protectedRouter.GET("/auth/api-keys", a.authHandler.WithAppUserAuthChain(a.ListAPIKeys)...)
 	protectedRouter.DELETE("/auth/api-keys/:id", a.authHandler.WithAppUserAuthChain(a.DeleteAPIKey)...)
+	protectedRouter.POST("/auth/system-key", a.authHandler.WithAppUserAuthChain(a.GetOrCreateSystemKey)...)
 }
 
 // CreateGuestLogin godoc
@@ -190,6 +191,23 @@ func (a *AuthRoute) ListAPIKeys(c *gin.Context) {
 // @Router /auth/api-keys/{id} [delete]
 func (a *AuthRoute) DeleteAPIKey(c *gin.Context) {
 	a.apiKeyHandler.Delete(c)
+}
+
+// GetOrCreateSystemKey godoc
+// @Summary Get or create system API key
+// @Description Returns an existing active system key or creates a new one. System keys are for internal service use and not shown in user's key list.
+// @Tags Authentication API
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param request body object false "Optional TTL configuration"
+// @Success 200 {object} object "Existing system key (key value not returned)"
+// @Success 201 {object} object "New system key created with key value"
+// @Failure 401 {object} responses.ErrorResponse "Unauthorized - invalid or expired token"
+// @Failure 500 {object} responses.ErrorResponse "Internal server error"
+// @Router /auth/system-key [post]
+func (a *AuthRoute) GetOrCreateSystemKey(c *gin.Context) {
+	a.apiKeyHandler.GetOrCreateSystemKey(c)
 }
 
 // ValidateAPIKey godoc
