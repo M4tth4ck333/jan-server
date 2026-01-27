@@ -290,8 +290,12 @@ class E2BGateway(SandboxGateway):
             files = sandbox.files.list(path)
             result = []
             for f in files:
-                # E2B SDK uses 'type' attribute: 'file' or 'dir'
-                is_dir = getattr(f, "type", "") == "dir"
+                # E2B SDK may expose a FileType enum or a plain string.
+                file_type = getattr(f, "type", None)
+                if isinstance(file_type, str):
+                    is_dir = file_type == "dir"
+                else:
+                    is_dir = file_type is not None and getattr(file_type, "value", "") == "dir"
                 result.append(
                     FileInfo(
                         name=f.name,

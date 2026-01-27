@@ -25,17 +25,20 @@ type SandboxMCP struct {
 	llmClient *llmapi.Client
 }
 
-type sandboxContextSetter interface {
-	SetContext(userID, conversationID string)
-}
-
-type sandboxRunner interface {
-	EnsureSandboxRunning(ctx context.Context, userID string) error
-}
-
-type sandboxWorkspaceRunner interface {
-	EnsureWorkspace(ctx context.Context, userID, conversationID string) error
-}
+// Tool descriptions - single source of truth
+const (
+	descShellExec         = "Execute shell commands in the sandbox. Returns stdout, stderr, and exit code. Use for file operations, system commands, and automation tasks."
+	descFileRead          = "Read file contents from the sandbox filesystem."
+	descFileWrite         = "Write content to a file in the sandbox filesystem."
+	descFileList          = "List files and directories in a sandbox path."
+	descCodeExecute       = "Execute code in a specific programming language in the sandbox."
+	descInstallPackages   = "Install packages in the sandbox environment."
+	descMarkitdownConvert = "Convert a URL or document to Markdown format. Useful for extracting readable text from web pages."
+	descScreenshot        = "Take a screenshot of the sandbox desktop."
+	descClick             = "Click at a specific position on the sandbox desktop."
+	descType              = "Type text on the sandbox desktop."
+	descBrowserInfo       = "Get browser information from the sandbox."
+)
 
 // NewSandboxMCP creates a new Sandbox MCP handler
 func NewSandboxMCP(provider sandbox.Provider) *SandboxMCP {
@@ -62,24 +65,21 @@ func (s *SandboxMCP) ProviderName() string {
 	return s.provider.Name()
 }
 
-func (s *SandboxMCP) setProviderContext(ctx context.Context, req *mcpsdk.CallToolRequest) {
+// setProviderContext extracts user/conversation context and returns an enhanced context.
+// The returned context should be passed to provider methods.
+func (s *SandboxMCP) setProviderContext(ctx context.Context, req *mcpsdk.CallToolRequest) context.Context {
 	if s == nil || s.provider == nil {
-		return
-	}
-
-	setter, ok := s.provider.(sandboxContextSetter)
-	if !ok {
-		return
+		return ctx
 	}
 
 	callCtx := extractAllContext(req)
 	userID := callCtx["user_id"]
 	conversationID := callCtx["conversation_id"]
 
+	// Extract conversation_id from tracking context (X-Conversation-ID header)
+	// Sandbox tools only require X-Conversation-ID and Authorization, not X-Tool-Call-ID
 	if conversationID == "" && ctx != nil {
-		if tracking, ok := GetToolTracking(ctx); ok {
-			conversationID = tracking.ConversationID
-		}
+		conversationID = GetConversationID(ctx)
 	}
 
 	if userID == "" && ctx != nil {
@@ -91,20 +91,11 @@ func (s *SandboxMCP) setProviderContext(ctx context.Context, req *mcpsdk.CallToo
 	}
 
 	if userID == "" && conversationID == "" {
-		return
+		return ctx
 	}
 
-	if runner, ok := s.provider.(sandboxWorkspaceRunner); ok && userID != "" && conversationID != "" {
-		if err := runner.EnsureWorkspace(ctx, userID, conversationID); err != nil {
-			log.Warn().Err(err).Str("provider", s.provider.Name()).Msg("Failed to ensure sandbox workspace")
-		}
-	} else if runner, ok := s.provider.(sandboxRunner); ok && userID != "" {
-		if err := runner.EnsureSandboxRunning(ctx, userID); err != nil {
-			log.Warn().Err(err).Str("provider", s.provider.Name()).Msg("Failed to ensure sandbox running")
-		}
-	}
-
-	setter.SetContext(userID, conversationID)
+	// Inject user context into the context for thread-safe access by provider
+	return sandbox.WithUserContext(ctx, userID, conversationID)
 }
 
 // RegisterTools registers sandbox tools with the MCP server
@@ -139,23 +130,203 @@ func (s *SandboxMCP) RegisterTools(server *mcpsdk.Server) {
 		Msg("Sandbox tools registered")
 }
 
+// GetToolDefinitions returns the tool definitions for sandbox execution tools.
+// Used by MCPRoute to include these tools in tools/list response.
+func (s *SandboxMCP) GetToolDefinitions() []ToolDefinition {
+	if s == nil || s.provider == nil || !s.provider.IsEnabled() {
+		return nil
+	}
+
+	providerName := s.provider.Name()
+
+	// Core tools (available for both AIO and E2B)
+	tools := []ToolDefinition{
+		{
+			Name:        "sandbox_shell_exec",
+			Description: descShellExec,
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"command": map[string]interface{}{
+						"type":        "string",
+						"description": "Shell command to execute",
+					},
+				},
+				"required": []string{"command"},
+			},
+		},
+		{
+			Name:        "sandbox_file_read",
+			Description: descFileRead,
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Path to the file to read",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			Name:        "sandbox_file_write",
+			Description: descFileWrite,
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Path to the file to write",
+					},
+					"content": map[string]interface{}{
+						"type":        "string",
+						"description": "Content to write to the file",
+					},
+				},
+				"required": []string{"path", "content"},
+			},
+		},
+		{
+			Name:        "sandbox_file_list",
+			Description: descFileList,
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"path": map[string]interface{}{
+						"type":        "string",
+						"description": "Path to list",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			Name:        "sandbox_code_execute",
+			Description: descCodeExecute,
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"code": map[string]interface{}{
+						"type":        "string",
+						"description": "Code to execute",
+					},
+					"language": map[string]interface{}{
+						"type":        "string",
+						"description": "Programming language (python, javascript, etc.)",
+					},
+				},
+				"required": []string{"code", "language"},
+			},
+		},
+		{
+			Name:        "sandbox_install_packages",
+			Description: descInstallPackages,
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"packages": map[string]interface{}{
+						"type":        "array",
+						"items":       map[string]interface{}{"type": "string"},
+						"description": "List of packages to install",
+					},
+					"manager": map[string]interface{}{
+						"type":        "string",
+						"description": "Package manager to use (pip, npm, apt, etc.)",
+					},
+				},
+				"required": []string{"packages"},
+			},
+		},
+		{
+			Name:        "sandbox_markitdown_convert",
+			Description: descMarkitdownConvert,
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"url": map[string]interface{}{
+						"type":        "string",
+						"description": "URL to convert to markdown",
+					},
+				},
+			},
+		},
+	}
+
+	// E2B-specific desktop tools
+	if providerName == "e2b" {
+		tools = append(tools, []ToolDefinition{
+			{
+				Name:        "sandbox_screenshot",
+				Description: descScreenshot,
+				InputSchema: map[string]interface{}{
+					"type":       "object",
+					"properties": map[string]interface{}{},
+				},
+			},
+			{
+				Name:        "sandbox_click",
+				Description: descClick,
+				InputSchema: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"x": map[string]interface{}{
+							"type":        "integer",
+							"description": "X coordinate to click",
+						},
+						"y": map[string]interface{}{
+							"type":        "integer",
+							"description": "Y coordinate to click",
+						},
+					},
+					"required": []string{"x", "y"},
+				},
+			},
+			{
+				Name:        "sandbox_type",
+				Description: descType,
+				InputSchema: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"text": map[string]interface{}{
+							"type":        "string",
+							"description": "Text to type",
+						},
+					},
+					"required": []string{"text"},
+				},
+			},
+		}...)
+	}
+
+	// AIO-specific tools
+	if providerName == "aio" {
+		tools = append(tools, ToolDefinition{
+			Name:        "sandbox_browser_info",
+			Description: descBrowserInfo,
+			InputSchema: map[string]interface{}{
+				"type":       "object",
+				"properties": map[string]interface{}{},
+			},
+		})
+	}
+
+	return tools
+}
+
 // --- Shell Tool ---
 
 type SandboxShellExecArgs struct {
-	Command        string `json:"command"`
-	ToolCallID     string `json:"tool_call_id,omitempty"`
-	RequestID      string `json:"request_id,omitempty"`
-	ConversationID string `json:"conversation_id,omitempty"`
-	UserID         string `json:"user_id,omitempty"`
+	Command string `json:"command"`
 }
 
 func (s *SandboxMCP) registerShellExec(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_shell_exec",
-		Description: "Execute shell commands in the sandbox. Returns stdout, stderr, and exit code. Use for file operations, system commands, and automation tasks.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxShellExecArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descShellExec,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxShellExecArgs) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 		callCtx := extractAllContext(req)
 
@@ -205,9 +376,9 @@ func (s *SandboxMCP) registerFileRead(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_file_read",
-		Description: "Read file contents from sandbox filesystem. Provide the path to the file.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxFileReadArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descFileRead,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxFileReadArgs) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -244,9 +415,9 @@ func (s *SandboxMCP) registerFileWrite(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_file_write",
-		Description: "Write content to a file in sandbox filesystem. Creates parent directories if needed.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxFileWriteArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descFileWrite,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxFileWriteArgs) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -290,9 +461,9 @@ func (s *SandboxMCP) registerFileList(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_file_list",
-		Description: "List files and directories in sandbox filesystem. Returns file names, sizes, and types.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxFileListArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descFileList,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxFileListArgs) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -332,9 +503,9 @@ func (s *SandboxMCP) registerCodeExecute(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_code_execute",
-		Description: "Execute Python or Node.js code in sandbox. Set language to 'python' or 'nodejs'. Returns stdout, stderr, and execution results.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxCodeExecuteArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descCodeExecute,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxCodeExecuteArgs) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 		callCtx := extractAllContext(req)
 
@@ -432,9 +603,9 @@ func (s *SandboxMCP) registerInstallPackages(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_install_packages",
-		Description: "Install packages using pip (Python) or npm (Node.js) in the sandbox. Use this before running code that requires external libraries.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxInstallPackagesArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descInstallPackages,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxInstallPackagesArgs) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 		callCtx := extractAllContext(req)
 
@@ -542,9 +713,9 @@ func (s *SandboxMCP) registerMarkitdownConvert(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_markitdown_convert",
-		Description: "Convert a URL or document to Markdown format. Useful for extracting readable text from web pages.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxMarkitdownConvertArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descMarkitdownConvert,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxMarkitdownConvertArgs) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -578,9 +749,9 @@ func (s *SandboxMCP) registerBrowserInfo(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_browser_info",
-		Description: "Get browser information from sandbox including CDP URL for automation.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input struct{}) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descBrowserInfo,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input struct{}) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -619,9 +790,9 @@ func (s *SandboxMCP) registerScreenshot(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_screenshot",
-		Description: "Take a screenshot of the sandbox desktop. Returns base64-encoded PNG image.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input struct{}) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descScreenshot,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input struct{}) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -671,9 +842,9 @@ func (s *SandboxMCP) registerClick(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_click",
-		Description: "Perform a mouse click at coordinates in the sandbox.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxClickArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descClick,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxClickArgs) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().
@@ -723,9 +894,9 @@ func (s *SandboxMCP) registerType(server *mcpsdk.Server) {
 	providerName := s.provider.Name()
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "sandbox_type",
-		Description: "Type text in the sandbox.",
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxTypeArgs) (*mcpsdk.CallToolResult, map[string]any, error) {
-		s.setProviderContext(ctx, req)
+		Description: descType,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input SandboxTypeArgs) (*mcpsdk.CallToolResult, any, error) {
+		ctx = s.setProviderContext(ctx, req)
 		startTime := time.Now()
 
 		log.Debug().

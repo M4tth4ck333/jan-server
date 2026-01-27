@@ -19,8 +19,6 @@ type Client struct {
 	timeout    time.Duration
 	enabled    bool
 	httpClient *http.Client
-	userID     string // Current user context (set per request)
-	convID     string // Current conversation context (set per request)
 }
 
 // ClientConfig holds E2B client configuration
@@ -67,12 +65,12 @@ func (c *Client) BaseURL() string {
 	return c.baseURL
 }
 
-// SetContext sets the user and conversation context for subsequent calls
+// SetContext is a no-op for E2B client.
+// User context is now passed via context.Context using sandboxdomain.WithUserContext().
+// This method exists for interface compatibility but does nothing.
 func (c *Client) SetContext(userID, conversationID string) {
-	if c != nil {
-		c.userID = userID
-		c.convID = conversationID
-	}
+	// No-op: context is passed via context.Context, not stored on struct
+	// This avoids race conditions in concurrent requests
 }
 
 // mcpRequest represents an MCP JSON-RPC request
@@ -102,8 +100,9 @@ func (c *Client) callMCP(ctx context.Context, method string, params map[string]a
 		return nil, fmt.Errorf("e2b client not enabled")
 	}
 
-	if c.userID == "" {
-		return nil, fmt.Errorf("user_id not set - call SetContext first")
+	userID := sandboxdomain.GetUserID(ctx)
+	if userID == "" {
+		return nil, fmt.Errorf("user_id not set in context - use sandboxdomain.WithUserContext()")
 	}
 
 	req := mcpRequest{
@@ -118,7 +117,7 @@ func (c *Client) callMCP(ctx context.Context, method string, params map[string]a
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox/mcp", c.baseURL, c.userID)
+	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox/mcp", c.baseURL, userID)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
@@ -212,13 +211,14 @@ func extractImageFromResult(result map[string]any) (string, error) {
 
 // ShellExec executes a command in the sandbox shell
 func (c *Client) ShellExec(ctx context.Context, command string) (*sandboxdomain.ShellResult, error) {
-	if c.convID == "" {
-		return nil, fmt.Errorf("conversation_id not set - call SetContext first")
+	convID := sandboxdomain.GetConversationID(ctx)
+	if convID == "" {
+		return nil, fmt.Errorf("conversation_id not set in context")
 	}
 
 	startTime := time.Now()
 	result, err := c.callTool(ctx, "e2b_desktop_shell", map[string]any{
-		"conversation_id": c.convID,
+		"conversation_id": convID,
 		"command":         command,
 	})
 	if err != nil {
@@ -240,12 +240,13 @@ func (c *Client) ShellExec(ctx context.Context, command string) (*sandboxdomain.
 
 // FileRead reads file contents from the sandbox filesystem
 func (c *Client) FileRead(ctx context.Context, path string) (string, error) {
-	if c.convID == "" {
-		return "", fmt.Errorf("conversation_id not set - call SetContext first")
+	convID := sandboxdomain.GetConversationID(ctx)
+	if convID == "" {
+		return "", fmt.Errorf("conversation_id not set in context")
 	}
 
 	result, err := c.callTool(ctx, "e2b_desktop_file_read", map[string]any{
-		"conversation_id": c.convID,
+		"conversation_id": convID,
 		"path":            path,
 	})
 	if err != nil {
@@ -257,12 +258,13 @@ func (c *Client) FileRead(ctx context.Context, path string) (string, error) {
 
 // FileWrite writes content to a file in the sandbox filesystem
 func (c *Client) FileWrite(ctx context.Context, path, content string) (*sandboxdomain.FileWriteResult, error) {
-	if c.convID == "" {
-		return nil, fmt.Errorf("conversation_id not set - call SetContext first")
+	convID := sandboxdomain.GetConversationID(ctx)
+	if convID == "" {
+		return nil, fmt.Errorf("conversation_id not set in context")
 	}
 
 	result, err := c.callTool(ctx, "e2b_desktop_file_write", map[string]any{
-		"conversation_id": c.convID,
+		"conversation_id": convID,
 		"path":            path,
 		"content":         content,
 	})
@@ -284,12 +286,13 @@ func (c *Client) FileWrite(ctx context.Context, path, content string) (*sandboxd
 
 // FileList lists files and directories at the given path
 func (c *Client) FileList(ctx context.Context, path string) ([]sandboxdomain.FileInfo, error) {
-	if c.convID == "" {
-		return nil, fmt.Errorf("conversation_id not set - call SetContext first")
+	convID := sandboxdomain.GetConversationID(ctx)
+	if convID == "" {
+		return nil, fmt.Errorf("conversation_id not set in context")
 	}
 
 	result, err := c.callTool(ctx, "e2b_desktop_file_list", map[string]any{
-		"conversation_id": c.convID,
+		"conversation_id": convID,
 		"path":            path,
 	})
 	if err != nil {
@@ -329,13 +332,14 @@ func (c *Client) FileList(ctx context.Context, path string) ([]sandboxdomain.Fil
 
 // CodeExecute executes code in the specified language
 func (c *Client) CodeExecute(ctx context.Context, code, language string) (*sandboxdomain.CodeResult, error) {
-	if c.convID == "" {
-		return nil, fmt.Errorf("conversation_id not set - call SetContext first")
+	convID := sandboxdomain.GetConversationID(ctx)
+	if convID == "" {
+		return nil, fmt.Errorf("conversation_id not set in context")
 	}
 
 	startTime := time.Now()
 	result, err := c.callTool(ctx, "e2b_desktop_code_execute", map[string]any{
-		"conversation_id": c.convID,
+		"conversation_id": convID,
 		"code":            code,
 		"language":        language,
 	})
@@ -524,7 +528,6 @@ func (c *Client) EnsureSandboxRunning(ctx context.Context, userID string) error 
 		return fmt.Errorf("start sandbox failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	c.userID = userID
 	return nil
 }
 
@@ -555,8 +558,6 @@ func (c *Client) EnsureWorkspace(ctx context.Context, userID, conversationID str
 		return fmt.Errorf("ensure workspace failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	c.userID = userID
-	c.convID = conversationID
 	return nil
 }
 
@@ -590,3 +591,439 @@ func findLastParen(s string) int {
 
 // Verify that Client implements Provider interface
 var _ sandboxdomain.Provider = (*Client)(nil)
+
+// Verify that Client implements Manager interface
+var _ sandboxdomain.Manager = (*Client)(nil)
+
+// --- Manager Interface Implementation ---
+
+// sandboxResponse represents the response from e2b-service sandbox endpoints
+type sandboxResponse struct {
+	PublicID       string  `json:"public_id"`
+	E2BSandboxID   string  `json:"e2b_sandbox_id"`
+	UserID         string  `json:"user_id"`
+	Status         string  `json:"status"`
+	ViewURL        *string `json:"view_url"`
+	ControlURL     *string `json:"control_url"`
+	StartedAt      *string `json:"started_at"`
+	TimeoutAt      *string `json:"timeout_at"`
+	PausedAt       *string `json:"paused_at"`
+	PauseExpiresAt *string `json:"pause_expires_at"`
+	ErrorMessage   *string `json:"error_message"`
+}
+
+// parseTime parses a time string, returning zero time on error
+func parseTime(s *string) time.Time {
+	if s == nil || *s == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, *s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// toSandboxInfo converts sandboxResponse to SandboxInfo
+func (r *sandboxResponse) toSandboxInfo() *sandboxdomain.SandboxInfo {
+	info := &sandboxdomain.SandboxInfo{
+		SandboxID: r.E2BSandboxID,
+		Status:    r.Status,
+		TimeoutAt: parseTime(r.TimeoutAt),
+		StartedAt: parseTime(r.StartedAt),
+	}
+	if r.ViewURL != nil {
+		info.ViewURL = *r.ViewURL
+	}
+	if r.ControlURL != nil {
+		info.ControlURL = *r.ControlURL
+	}
+	return info
+}
+
+// toSandboxState converts sandboxResponse to SandboxState
+func (r *sandboxResponse) toSandboxState() *sandboxdomain.SandboxState {
+	state := &sandboxdomain.SandboxState{
+		Status:         r.Status,
+		SandboxID:      r.E2BSandboxID,
+		TimeoutAt:      parseTime(r.TimeoutAt),
+		StartedAt:      parseTime(r.StartedAt),
+		PausedAt:       parseTime(r.PausedAt),
+		PauseExpiresAt: parseTime(r.PauseExpiresAt),
+	}
+	if r.ViewURL != nil {
+		state.ViewURL = *r.ViewURL
+	}
+	if r.ControlURL != nil {
+		state.ControlURL = *r.ControlURL
+	}
+	return state
+}
+
+// Start creates or resumes a sandbox for the given user and conversation.
+func (c *Client) Start(ctx context.Context, userID, conversationID string, timeout int) (*sandboxdomain.SandboxInfo, error) {
+	if !c.IsEnabled() {
+		return nil, fmt.Errorf("e2b client not enabled")
+	}
+
+	// Apply timeout on sandbox start (workspace endpoint does not accept timeout)
+	if timeout > 0 {
+		startURL := fmt.Sprintf("%s/api/v1/users/%s/sandbox", c.baseURL, userID)
+		startBody, err := json.Marshal(map[string]int{"timeout": timeout})
+		if err != nil {
+			return nil, fmt.Errorf("marshal start request: %w", err)
+		}
+		startReq, err := http.NewRequestWithContext(ctx, http.MethodPost, startURL, bytes.NewReader(startBody))
+		if err != nil {
+			return nil, fmt.Errorf("create start request: %w", err)
+		}
+		startReq.Header.Set("Content-Type", "application/json")
+
+		startResp, err := c.httpClient.Do(startReq)
+		if err != nil {
+			return nil, fmt.Errorf("start sandbox request: %w", err)
+		}
+		defer startResp.Body.Close()
+
+		startRespBody, err := io.ReadAll(startResp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("read start response: %w", err)
+		}
+		if startResp.StatusCode < 200 || startResp.StatusCode >= 300 {
+			return nil, fmt.Errorf("start sandbox failed with status %d: %s", startResp.StatusCode, string(startRespBody))
+		}
+	}
+
+	// Use workspace endpoint to ensure workspace exists
+	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox/workspace/%s", c.baseURL, userID, conversationID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("start sandbox failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response - workspace endpoint returns workspace with nested sandbox
+	var workspaceResp struct {
+		Sandbox sandboxResponse `json:"sandbox"`
+	}
+	if err := json.Unmarshal(body, &workspaceResp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	return workspaceResp.Sandbox.toSandboxInfo(), nil
+}
+
+// Stop terminates and deletes a user's sandbox.
+func (c *Client) Stop(ctx context.Context, userID string) error {
+	if !c.IsEnabled() {
+		return fmt.Errorf("e2b client not enabled")
+	}
+
+	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox", c.baseURL, userID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return sandboxdomain.NewSandboxNotFoundError(userID)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("stop sandbox failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// Pause pauses a running sandbox.
+func (c *Client) Pause(ctx context.Context, userID string) error {
+	if !c.IsEnabled() {
+		return fmt.Errorf("e2b client not enabled")
+	}
+
+	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox/pause", c.baseURL, userID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return sandboxdomain.NewSandboxNotFoundError(userID)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("pause sandbox failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// Extend extends the timeout of a running sandbox.
+func (c *Client) Extend(ctx context.Context, userID string, additionalSeconds int) (*sandboxdomain.SandboxInfo, error) {
+	if !c.IsEnabled() {
+		return nil, fmt.Errorf("e2b client not enabled")
+	}
+
+	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox/extend", c.baseURL, userID)
+	reqBody, _ := json.Marshal(map[string]int{"additional_seconds": additionalSeconds})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode == 404 {
+		return nil, sandboxdomain.NewSandboxNotFoundError(userID)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("extend sandbox failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var sandboxResp sandboxResponse
+	if err := json.Unmarshal(body, &sandboxResp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	return sandboxResp.toSandboxInfo(), nil
+}
+
+// GetState returns the current state of a user's sandbox.
+func (c *Client) GetState(ctx context.Context, userID string) (*sandboxdomain.SandboxState, error) {
+	if !c.IsEnabled() {
+		return nil, fmt.Errorf("e2b client not enabled")
+	}
+
+	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox", c.baseURL, userID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		// No sandbox exists - return nil state (not an error)
+		return nil, nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("get sandbox state failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var sandboxResp sandboxResponse
+	if err := json.Unmarshal(body, &sandboxResp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	return sandboxResp.toSandboxState(), nil
+}
+
+// IsRunning returns true if the user has a running sandbox.
+func (c *Client) IsRunning(ctx context.Context, userID string) (bool, error) {
+	state, err := c.GetState(ctx, userID)
+	if err != nil {
+		return false, err
+	}
+	return state != nil && state.Status == "running", nil
+}
+
+// CallTool executes a tool via MCP protocol in the sandbox.
+func (c *Client) CallTool(ctx context.Context, userID, toolName string, args map[string]interface{}) (map[string]interface{}, error) {
+	if !c.IsEnabled() {
+		return nil, fmt.Errorf("e2b client not enabled")
+	}
+
+	// Build MCP tools/call request
+	mcpReq := mcpRequest{
+		Jsonrpc: "2.0",
+		ID:      1,
+		Method:  "tools/call",
+		Params: map[string]interface{}{
+			"name":      toolName,
+			"arguments": args,
+		},
+	}
+
+	body, err := json.Marshal(mcpReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox/mcp", c.baseURL, userID)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("mcp call failed with status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var mcpResp mcpResponse
+	if err := json.Unmarshal(respBody, &mcpResp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if mcpResp.Error != nil {
+		return nil, fmt.Errorf("mcp error %d: %s", mcpResp.Error.Code, mcpResp.Error.Message)
+	}
+
+	return mcpResp.Result, nil
+}
+
+// GetDynamicTools fetches tools from MCP servers running inside the sandbox.
+func (c *Client) GetDynamicTools(ctx context.Context, userID string) ([]sandboxdomain.DynamicTool, error) {
+	if !c.IsEnabled() {
+		return nil, fmt.Errorf("e2b client not enabled")
+	}
+
+	// Call tools/list on the sandbox MCP endpoint
+	req := mcpRequest{
+		Jsonrpc: "2.0",
+		ID:      1,
+		Method:  "tools/list",
+	}
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v1/users/%s/sandbox/mcp", c.baseURL, userID)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		// Sandbox not running or not available - return empty list
+		return []sandboxdomain.DynamicTool{}, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		// Sandbox not running - return empty list
+		return []sandboxdomain.DynamicTool{}, nil
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	var mcpResp mcpResponse
+	if err := json.Unmarshal(respBody, &mcpResp); err != nil {
+		return nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	if mcpResp.Error != nil {
+		// MCP error - sandbox might not be ready
+		return []sandboxdomain.DynamicTool{}, nil
+	}
+
+	// Parse tools from result
+	tools := make([]sandboxdomain.DynamicTool, 0)
+	if mcpResp.Result == nil {
+		return tools, nil
+	}
+
+	toolsRaw, ok := mcpResp.Result["tools"].([]interface{})
+	if !ok {
+		return tools, nil
+	}
+
+	for _, t := range toolsRaw {
+		toolMap, ok := t.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		name, _ := toolMap["name"].(string)
+		if name == "" {
+			continue
+		}
+
+		// Skip e2b_desktop_* and e2b_sandbox_* tools (these are static)
+		// Only return dynamic tools (like browser tools from search-mcp-server)
+		if strings.HasPrefix(name, "e2b_desktop_") || strings.HasPrefix(name, "e2b_sandbox_") {
+			continue
+		}
+
+		desc, _ := toolMap["description"].(string)
+		schema, _ := toolMap["inputSchema"].(map[string]interface{})
+
+		tools = append(tools, sandboxdomain.DynamicTool{
+			Name:        name,
+			Description: desc,
+			InputSchema: schema,
+		})
+	}
+
+	return tools, nil
+}

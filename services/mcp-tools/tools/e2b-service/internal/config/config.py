@@ -50,8 +50,11 @@ class Settings(BaseSettings):
         if self.db_postgresql_write_dsn:
             # Convert to async driver if needed
             dsn = self.db_postgresql_write_dsn
+            # Handle both postgres:// (old) and postgresql:// (new) schemes
+            if dsn.startswith("postgres://"):
+                return dsn.replace("postgres://", "postgresql+asyncpg://", 1)
             if dsn.startswith("postgresql://"):
-                return dsn.replace("postgresql://", "postgresql+asyncpg://")
+                return dsn.replace("postgresql://", "postgresql+asyncpg://", 1)
             return dsn
         return f"postgresql+asyncpg://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
 

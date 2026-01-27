@@ -22,7 +22,10 @@ var RoutesProvider = wire.NewSet(
 	ProvideMemoryMCP,
 	ProvideImageGenerateMCP,
 	ProvideImageEditMCP,
+	ProvideE2BClient, // Shared E2B client (used by both Provider and Manager)
 	ProvideSandboxMCP,
+	ProvideSandboxManagement,
+	ProvideSandboxManager,
 	ProvideAgentProxyMCP,
 	ProvideToolConfigCache,
 	ProvideMCPRoute,
@@ -102,8 +105,33 @@ func ProvideToolConfigCache(cfg *config.Config, llmClient *llmapi.Client) *toolc
 	return toolconfig.NewCache(llmClient)
 }
 
-// ProvideSandboxMCP creates a SandboxMCP handler with the appropriate provider
-func ProvideSandboxMCP(cfg *config.Config) *mcp.SandboxMCP {
+// ProvideE2BClient creates a shared E2B client when SANDBOX_PROVIDER=e2b.
+// This client is used by both SandboxMCP (Provider) and SandboxManagement (Manager).
+func ProvideE2BClient(cfg *config.Config) *e2b.Client {
+	if cfg.SandboxProvider != "e2b" {
+		return nil
+	}
+
+	client := e2b.NewClient(e2b.ClientConfig{
+		BaseURL: cfg.E2BServiceURL,
+		Timeout: cfg.E2BTimeout,
+		Enabled: true,
+	})
+	if !client.IsEnabled() {
+		log.Warn().Msg("E2B client failed to initialize")
+		return nil
+	}
+	log.Info().
+		Str("provider", "e2b").
+		Str("url", cfg.E2BServiceURL).
+		Dur("timeout", cfg.E2BTimeout).
+		Msg("E2B client initialized (shared)")
+	return client
+}
+
+// ProvideSandboxMCP creates a SandboxMCP handler with the appropriate provider.
+// Uses the shared E2B client when provider is e2b.
+func ProvideSandboxMCP(cfg *config.Config, e2bClient *e2b.Client) *mcp.SandboxMCP {
 	var sandboxProvider sandboxdomain.Provider
 
 	switch cfg.SandboxProvider {
@@ -126,22 +154,11 @@ func ProvideSandboxMCP(cfg *config.Config) *mcp.SandboxMCP {
 		}
 
 	case "e2b":
-		e2bClient := e2b.NewClient(e2b.ClientConfig{
-			BaseURL: cfg.E2BServiceURL,
-			Timeout: cfg.E2BTimeout,
-			Enabled: true,
-		})
-		if e2bClient.IsEnabled() {
-			sandboxProvider = e2bClient
-			log.Info().
-				Str("provider", "e2b").
-				Str("url", cfg.E2BServiceURL).
-				Dur("timeout", cfg.E2BTimeout).
-				Msg("Sandbox provider initialized")
-		} else {
-			log.Warn().Msg("SANDBOX_PROVIDER=e2b but client failed to initialize")
+		if e2bClient == nil || !e2bClient.IsEnabled() {
+			log.Warn().Msg("SANDBOX_PROVIDER=e2b but E2B client not available")
 			return nil
 		}
+		sandboxProvider = e2bClient
 
 	case "":
 		log.Info().Msg("Sandbox provider disabled (SANDBOX_PROVIDER not set)")
@@ -153,6 +170,33 @@ func ProvideSandboxMCP(cfg *config.Config) *mcp.SandboxMCP {
 	}
 
 	return mcp.NewSandboxMCP(sandboxProvider)
+}
+
+// ProvideSandboxManagement creates a SandboxManagement handler (E2B only)
+func ProvideSandboxManagement(cfg *config.Config, manager sandboxdomain.Manager) *mcp.SandboxManagement {
+	if cfg.SandboxProvider != "e2b" {
+		log.Debug().Msg("Sandbox management disabled (only available for E2B provider)")
+		return nil
+	}
+	if manager == nil {
+		log.Warn().Msg("Sandbox management disabled (manager not initialized)")
+		return nil
+	}
+	log.Info().Msg("Sandbox management tools enabled (E2B)")
+	return mcp.NewSandboxManagement(manager)
+}
+
+// ProvideSandboxManager returns the E2B client as Manager when SANDBOX_PROVIDER=e2b.
+// Uses the shared E2B client.
+func ProvideSandboxManager(cfg *config.Config, e2bClient *e2b.Client) sandboxdomain.Manager {
+	if cfg.SandboxProvider != "e2b" {
+		return nil
+	}
+	if e2bClient == nil || !e2bClient.IsEnabled() {
+		log.Warn().Msg("Sandbox manager disabled (E2B client not available)")
+		return nil
+	}
+	return e2bClient
 }
 
 // ProvideAgentProxyMCP creates an AgentProxyMCP with dependencies
@@ -175,6 +219,7 @@ func ProvideAgentProxyMCP(cfg *config.Config) *mcp.AgentProxyMCP {
 
 // ProvideMCPRoute creates a MCPRoute with all dependencies
 func ProvideMCPRoute(
+	cfg *config.Config,
 	searchMCP *mcp.SearchMCP,
 	providerMCP *mcp.ProviderMCP,
 	sandboxFusionMCP *mcp.SandboxFusionMCP,
@@ -182,13 +227,29 @@ func ProvideMCPRoute(
 	imageMCP *mcp.ImageGenerateMCP,
 	imageEditMCP *mcp.ImageEditMCP,
 	sandboxMCP *mcp.SandboxMCP,
+	sandboxManagement *mcp.SandboxManagement,
 	agentProxyMCP *mcp.AgentProxyMCP,
 	llmClient *llmapi.Client,
 	toolConfigCache *toolconfig.Cache,
+	sandboxManager sandboxdomain.Manager,
 ) *mcp.MCPRoute {
 	// Set tool config cache on searchMCP for dynamic descriptions
 	if toolConfigCache != nil {
 		searchMCP.SetToolConfigCache(toolConfigCache)
 	}
-	return mcp.NewMCPRoute(searchMCP, providerMCP, sandboxFusionMCP, memoryMCP, imageMCP, imageEditMCP, sandboxMCP, agentProxyMCP, llmClient, toolConfigCache)
+	return mcp.NewMCPRoute(
+		searchMCP,
+		providerMCP,
+		sandboxFusionMCP,
+		memoryMCP,
+		imageMCP,
+		imageEditMCP,
+		sandboxMCP,
+		sandboxManagement,
+		agentProxyMCP,
+		llmClient,
+		toolConfigCache,
+		sandboxManager,
+		cfg.SandboxProvider,
+	)
 }

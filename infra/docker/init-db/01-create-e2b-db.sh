@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Create sandbox user and e2b_sandbox database for E2B service
 # This script runs automatically when PostgreSQL container starts for the first time
 

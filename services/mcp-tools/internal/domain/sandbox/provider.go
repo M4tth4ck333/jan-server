@@ -2,6 +2,43 @@ package sandbox
 
 import "context"
 
+// Context keys for passing user/conversation context through request context
+type contextKey string
+
+const (
+	// UserIDContextKey is the context key for user ID
+	UserIDContextKey contextKey = "sandbox_user_id"
+	// ConversationIDContextKey is the context key for conversation ID
+	ConversationIDContextKey contextKey = "sandbox_conversation_id"
+)
+
+// WithUserContext returns a new context with user and conversation IDs set
+func WithUserContext(ctx context.Context, userID, conversationID string) context.Context {
+	ctx = context.WithValue(ctx, UserIDContextKey, userID)
+	ctx = context.WithValue(ctx, ConversationIDContextKey, conversationID)
+	return ctx
+}
+
+// GetUserID extracts user ID from context
+func GetUserID(ctx context.Context) string {
+	if val := ctx.Value(UserIDContextKey); val != nil {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
+// GetConversationID extracts conversation ID from context
+func GetConversationID(ctx context.Context) string {
+	if val := ctx.Value(ConversationIDContextKey); val != nil {
+		if str, ok := val.(string); ok {
+			return str
+		}
+	}
+	return ""
+}
+
 // Provider defines the interface for sandbox backends (AIO or E2B)
 // Only one provider can be active at a time, selected via SANDBOX_PROVIDER config.
 type Provider interface {

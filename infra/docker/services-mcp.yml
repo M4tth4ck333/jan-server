@@ -209,6 +209,8 @@ services:
       E2B_SERVICE_PORT: 8095
       E2B_SANDBOX_TIMEOUT: ${E2B_SANDBOX_TIMEOUT:-1800}
       # Database Configuration (dedicated E2B database)
+      # Clear global DSN to use E2B-specific DB settings
+      DB_POSTGRESQL_WRITE_DSN: ""
       DB_HOST: ${E2B_DB_HOST:-api-db}
       DB_PORT: ${E2B_DB_PORT:-5432}
       DB_USER: ${E2B_DB_USER:-sandbox}
