@@ -16,15 +16,23 @@ import (
 
 // Executor executes steps for deep research plans.
 type Executor struct {
-	mcpClient   MCPClient
-	llmProvider LLMProvider
+	mcpClient     MCPClient
+	llmProvider   LLMProvider
+	sandboxHelper *agent.SandboxHelper
 }
 
 // NewExecutor creates a new deep research executor.
 func NewExecutor(mcpClient MCPClient, llmProvider LLMProvider) *Executor {
+	// Create sandbox helper if MCP client supports it
+	var sandboxHelper *agent.SandboxHelper
+	if toolCaller, ok := mcpClient.(agent.MCPToolCaller); ok {
+		sandboxHelper = agent.NewSandboxHelper(toolCaller)
+	}
+
 	return &Executor{
-		mcpClient:   mcpClient,
-		llmProvider: llmProvider,
+		mcpClient:     mcpClient,
+		llmProvider:   llmProvider,
+		sandboxHelper: sandboxHelper,
 	}
 }
 
@@ -116,6 +124,23 @@ func (e *Executor) executeToolCallWithRetry(ctx context.Context, step *plan.Step
 	// Check if this is a code execution tool
 	isCodeExecTool := toolName == "sandbox_code_execute" || toolName == "sandbox_shell_exec"
 	log.Debug().Bool("is_code_exec_tool", isCodeExecTool).Msg("[deep_research] tool type determined")
+
+	// Start sandbox automatically before code execution tools (E2B only)
+	if isCodeExecTool && e.sandboxHelper != nil {
+		opts := agent.StartSandboxOptions{
+			Timeout: 1800, // 30 minutes
+		}
+		if input.PlanContext != nil {
+			opts.ConversationID = input.PlanContext.ConversationID
+			opts.RequestID = input.PlanContext.ResponseID
+		}
+		if opts.ConversationID != "" {
+			if err := e.sandboxHelper.EnsureSandboxStarted(ctx, opts); err != nil {
+				log.Warn().Err(err).Msg("[deep_research] failed to start sandbox, continuing anyway")
+				// Don't fail - tool call might still work if sandbox is already running
+			}
+		}
+	}
 
 	// Execute the tool via MCP client
 	result, err := e.mcpClient.CallTool(ctx, callReq)

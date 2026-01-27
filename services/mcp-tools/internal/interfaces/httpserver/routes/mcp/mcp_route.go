@@ -695,31 +695,42 @@ func extractJSONFromSSE(data []byte) []byte {
 	return nil
 }
 
-// InjectUserContext extracts user_id from JWT token and injects it into request context
+// InjectUserContext extracts user_id from JWT token or API key and injects it into request context
 func InjectUserContext() gin.HandlerFunc {
 	return func(reqCtx *gin.Context) {
-		// Try to get auth token from gin context (set by auth middleware)
-		if tokenVal, exists := reqCtx.Get("auth_token"); exists {
-			if token, ok := tokenVal.(*jwt.Token); ok && token.Valid {
-				if claims, ok := token.Claims.(jwt.MapClaims); ok {
-					// Try to extract user_id from various claim fields
-					var userID string
-					if sub, ok := claims["sub"].(string); ok && sub != "" {
-						userID = sub
-					} else if uid, ok := claims["user_id"].(string); ok && uid != "" {
-						userID = uid
-					} else if uid, ok := claims["uid"].(string); ok && uid != "" {
-						userID = uid
-					}
+		var userID string
 
-					if userID != "" {
-						// Inject user_id into request context
-						ctx := context.WithValue(reqCtx.Request.Context(), "user_id", userID)
-						reqCtx.Request = reqCtx.Request.WithContext(ctx)
+		// First, check if user_id was already set by API key validation (in gin context)
+		if uid, exists := reqCtx.Get("user_id"); exists {
+			if str, ok := uid.(string); ok && str != "" {
+				userID = str
+			}
+		}
+
+		// If not set by API key, try to extract from JWT token
+		if userID == "" {
+			if tokenVal, exists := reqCtx.Get("auth_token"); exists {
+				if token, ok := tokenVal.(*jwt.Token); ok && token.Valid {
+					if claims, ok := token.Claims.(jwt.MapClaims); ok {
+						// Try to extract user_id from various claim fields
+						if sub, ok := claims["sub"].(string); ok && sub != "" {
+							userID = sub
+						} else if uid, ok := claims["user_id"].(string); ok && uid != "" {
+							userID = uid
+						} else if uid, ok := claims["uid"].(string); ok && uid != "" {
+							userID = uid
+						}
 					}
 				}
 			}
 		}
+
+		// Inject user_id into request context (required by sandbox tools)
+		if userID != "" {
+			ctx := context.WithValue(reqCtx.Request.Context(), "user_id", userID)
+			reqCtx.Request = reqCtx.Request.WithContext(ctx)
+		}
+
 		reqCtx.Next()
 	}
 }

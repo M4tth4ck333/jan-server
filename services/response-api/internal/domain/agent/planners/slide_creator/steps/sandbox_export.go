@@ -21,9 +21,12 @@ import (
 
 // ensurePlaywrightBrowsersMCP installs Playwright browsers via MCP sandbox_shell_exec tool
 // Key fixes: cleans up incomplete installations, copies chrome to headless shell path if missing
-func ensurePlaywrightBrowsersMCP(ctx context.Context, mcpClient planners.MCPClient, cacheDir string) error {
-	browsersDir := cacheDir + "/pw_browsers"
-	nodeEnvDir := cacheDir + "/node_env"
+func ensurePlaywrightBrowsersMCP(ctx context.Context, mcpClient planners.MCPClient, cacheDir, conversationID, requestID string) error {
+	// cacheDir is relative (e.g., ".cache/pptx_export")
+	// Use $HOME for cross-provider compatibility (E2B: /home/user, AIO: /home/gem)
+	fullCacheDir := "$HOME/" + cacheDir
+	browsersDir := fullCacheDir + "/pw_browsers"
+	nodeEnvDir := fullCacheDir + "/node_env"
 
 	// Commands to run (using sudo for system deps)
 	commands := []struct {
@@ -32,7 +35,7 @@ func ensurePlaywrightBrowsersMCP(ctx context.Context, mcpClient planners.MCPClie
 	}{
 		{
 			name: "Create cache directories",
-			cmd:  fmt.Sprintf("mkdir -p %s %s %s/outputs && chmod -R 777 %s 2>/dev/null || true", nodeEnvDir, browsersDir, cacheDir, cacheDir),
+			cmd:  fmt.Sprintf("mkdir -p %s %s %s/outputs && chmod -R 777 %s 2>/dev/null || true", nodeEnvDir, browsersDir, fullCacheDir, fullCacheDir),
 		},
 		{
 			name: "Initialize npm package",
@@ -72,6 +75,8 @@ func ensurePlaywrightBrowsersMCP(ctx context.Context, mcpClient planners.MCPClie
 			Arguments: map[string]interface{}{
 				"command": c.cmd,
 			},
+			ConversationID: conversationID,
+			RequestID:      requestID,
 		})
 		if err != nil {
 			return fmt.Errorf("sandbox_shell_exec failed for %s: %w", c.name, err)
@@ -111,6 +116,23 @@ func (e *SlideCreatorExecutor) executeExportPPTXViaMCP(ctx context.Context, para
 		}, nil
 	}
 
+	// Start sandbox automatically before PPTX export (E2B only)
+	if e.sandboxHelper != nil {
+		opts := agent.StartSandboxOptions{
+			Timeout: 1800, // 30 minutes
+		}
+		if input.PlanContext != nil {
+			opts.ConversationID = input.PlanContext.ConversationID
+			opts.RequestID = input.PlanContext.ResponseID
+		}
+		if opts.ConversationID != "" {
+			if err := e.sandboxHelper.EnsureSandboxStarted(ctx, opts); err != nil {
+				log.Warn().Err(err).Msg("[slide_creator] failed to start sandbox, continuing anyway")
+				// Don't fail - sandbox might already be running
+			}
+		}
+	}
+
 	outDir := extractOutputDir(input)
 	if outDir == "" {
 		outDir = outputDirForPlan(input)
@@ -144,11 +166,21 @@ func (e *SlideCreatorExecutor) executeExportPPTXViaMCP(ctx context.Context, para
 	}
 
 	outputFile := "presentation.pptx"
-	cacheDir := "/home/gem/.cache/pptx_export"
+	// Cache dir is relative to workspace - the JS code will resolve it using process.cwd()
+	// e2b-service sets cwd to /home/user/workspace/<conversation_id>
+	// So ".cache/pptx_export" becomes /home/user/workspace/<conv_id>/.cache/pptx_export
+	cacheDir := ".cache/pptx_export"
+
+	// Extract conversation context for sandbox tool calls
+	var conversationID, requestID string
+	if input.PlanContext != nil {
+		conversationID = input.PlanContext.ConversationID
+		requestID = input.PlanContext.ResponseID
+	}
 
 	// Ensure Playwright browsers are installed via MCP sandbox_shell_exec
-	log.Info().Str("cache_dir", cacheDir).Msg("[slide_creator] Ensuring Playwright browsers are installed via MCP")
-	if err := ensurePlaywrightBrowsersMCP(ctx, e.mcpClient, cacheDir); err != nil {
+	log.Info().Str("cache_dir", cacheDir).Str("conversation_id", conversationID).Msg("[slide_creator] Ensuring Playwright browsers are installed via MCP")
+	if err := ensurePlaywrightBrowsersMCP(ctx, e.mcpClient, cacheDir, conversationID, requestID); err != nil {
 		log.Warn().Err(err).Msg("[slide_creator] Playwright browser installation may have failed, continuing anyway")
 	}
 
@@ -165,6 +197,8 @@ func (e *SlideCreatorExecutor) executeExportPPTXViaMCP(ctx context.Context, para
 			"code":     code,
 			"language": "nodejs",
 		},
+		ConversationID: conversationID,
+		RequestID:      requestID,
 	})
 	if err != nil {
 		return &agent.ExecutionResult{
@@ -253,10 +287,14 @@ func (e *SlideCreatorExecutor) executeExportPPTXViaMCP(ctx context.Context, para
 	if len(imageNames) == 0 {
 		outputDirFromStdout := extractOutputDirFromOutput(stdout)
 		if outputDirFromStdout == "" {
-			outputDirFromStdout = filepath.ToSlash(filepath.Join(cacheDir, "outputs"))
+			// Fallback: only used when OUTPUT_DIR marker not in stdout (code execution likely crashed)
+			// This relative path works for E2B (resolved against workspace) but may fail for AIO
+			// depending on Python cwd. Best-effort recovery only.
+			outputDirFromStdout = ".outputs"
+			log.Warn().Str("fallback_dir", outputDirFromStdout).Msg("[slide_creator] OUTPUT_DIR not found in stdout, using fallback")
 		}
 		if outputDirFromStdout != "" {
-			downloaded, err := downloadSlideImagesMCP(ctx, e.mcpClient, outputDirFromStdout, outDir)
+			downloaded, err := downloadSlideImagesMCP(ctx, e.mcpClient, outputDirFromStdout, outDir, conversationID, requestID)
 			if err != nil {
 				log.Warn().Err(err).Msg("[slide_creator] failed to download slide images from sandbox")
 			} else if len(downloaded) > 0 {
@@ -362,10 +400,14 @@ const workdir = process.cwd();
 const INPUT_DIR = %s;
 const OUT_FILE = %s;
 const MODE = %s;
-const CACHE_DIR = %s;
+// CACHE_DIR uses $HOME for cross-provider compatibility (E2B: /home/user, AIO: /home/gem)
+// Cache can be shared across conversations since it's just browsers/npm packages
+const CACHE_DIR = path.join(process.env.HOME || workdir, %s);
 
 const RUN_ID = String(Date.now());
-const OUTPUT_DIR = path.join(CACHE_DIR, "outputs", RUN_ID);
+// OUTPUT_DIR must be inside workspace for sandbox_file_read compatibility
+// (e2b-service rejects paths that escape workspace)
+const OUTPUT_DIR = path.join(workdir, ".outputs", RUN_ID);
 const OUT_PATH = path.join(OUTPUT_DIR, path.basename(OUT_FILE));
 
 function run(cmd, args, opts) {
@@ -500,6 +542,9 @@ if (typeof res.status === "number" && res.status !== 0) process.exit(res.status)
 
 // Return PPTX as base64
 const pptx = fs.readFileSync(OUT_PATH);
+// Output absolute path for cross-provider compatibility:
+// - E2B: e2b-service accepts absolute paths within workspace (passes startswith check)
+// - AIO: Python opens absolute path directly without cwd dependency
 console.log("===OUTPUT_DIR===");
 console.log(OUTPUT_DIR);
 console.log("===OUTPUT_DIR_START===");
@@ -540,13 +585,22 @@ func jsQuoteMCP(s string) string {
 }
 
 // extractTextContent extracts text content from MCP result
+// If the content is a JSON object with a "stdout" field, extracts that instead
 func extractTextContent(result *tool.Result) string {
 	if result == nil {
 		return ""
 	}
 	for _, content := range result.Content {
 		if content.Type == "text" && content.Text != "" {
-			return content.Text
+			text := content.Text
+			// Check if this is a JSON response with stdout field (from sandbox_code_execute)
+			var codeResult struct {
+				Stdout string `json:"stdout"`
+			}
+			if err := json.Unmarshal([]byte(text), &codeResult); err == nil && codeResult.Stdout != "" {
+				return codeResult.Stdout
+			}
+			return text
 		}
 	}
 	return ""
@@ -605,13 +659,15 @@ func extractOutputDirFromOutput(output string) string {
 }
 
 // downloadSlideImagesMCP downloads slide images from sandbox using MCP tools
-func downloadSlideImagesMCP(ctx context.Context, mcpClient planners.MCPClient, outputDir, localDir string) ([]string, error) {
+func downloadSlideImagesMCP(ctx context.Context, mcpClient planners.MCPClient, outputDir, localDir, conversationID, requestID string) ([]string, error) {
 	// List files in sandbox output directory via MCP
 	listResult, err := mcpClient.CallTool(ctx, tool.CallRequest{
 		Name: "sandbox_file_list",
 		Arguments: map[string]interface{}{
 			"path": outputDir,
 		},
+		ConversationID: conversationID,
+		RequestID:      requestID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("sandbox_file_list failed: %w", err)
@@ -627,36 +683,54 @@ func downloadSlideImagesMCP(ctx context.Context, mcpClient planners.MCPClient, o
 		return nil, nil
 	}
 
-	// Try to parse as JSON
-	var fileList struct {
-		Files []struct {
-			Name string `json:"name"`
-			Path string `json:"path"`
-		} `json:"files"`
+	// Try to parse as JSON array (mcp-tools format: [{"name": "...", "is_dir": false, "size": 123}, ...])
+	var fileArray []struct {
+		Name  string `json:"name"`
+		IsDir bool   `json:"is_dir"`
+		Size  int64  `json:"size"`
 	}
-	if err := json.Unmarshal([]byte(listOutput), &fileList); err != nil {
-		// If not JSON, try line-by-line parsing
-		return parseAndDownloadImages(ctx, mcpClient, listOutput, outputDir, localDir)
+	if err := json.Unmarshal([]byte(listOutput), &fileArray); err != nil {
+		// Try legacy format: {"files": [...]}
+		var fileList struct {
+			Files []struct {
+				Name string `json:"name"`
+				Path string `json:"path"`
+			} `json:"files"`
+		}
+		if err := json.Unmarshal([]byte(listOutput), &fileList); err != nil {
+			// If not JSON, try line-by-line parsing
+			return parseAndDownloadImages(ctx, mcpClient, listOutput, outputDir, localDir, conversationID, requestID)
+		}
+		// Convert legacy format to array format
+		for _, f := range fileList.Files {
+			fileArray = append(fileArray, struct {
+				Name  string `json:"name"`
+				IsDir bool   `json:"is_dir"`
+				Size  int64  `json:"size"`
+			}{Name: f.Name})
+		}
 	}
 
 	var names []string
-	for _, f := range fileList.Files {
+	for _, f := range fileArray {
 		name := f.Name
+		if f.IsDir {
+			continue
+		}
 		if !strings.HasPrefix(strings.ToLower(name), "slide-") || !strings.HasSuffix(strings.ToLower(name), ".png") {
 			continue
 		}
 
-		// Read file from sandbox
-		path := f.Path
-		if path == "" {
-			path = outputDir + "/" + name
-		}
+		// Read file from sandbox (path is relative to workspace)
+		path := outputDir + "/" + name
 
 		readResult, err := mcpClient.CallTool(ctx, tool.CallRequest{
 			Name: "sandbox_file_read",
 			Arguments: map[string]interface{}{
 				"path": path,
 			},
+			ConversationID: conversationID,
+			RequestID:      requestID,
 		})
 		if err != nil {
 			log.Warn().Err(err).Str("file", name).Msg("[slide_creator] failed to read image from sandbox")
@@ -692,7 +766,7 @@ func downloadSlideImagesMCP(ctx context.Context, mcpClient planners.MCPClient, o
 	return names, nil
 }
 
-func parseAndDownloadImages(ctx context.Context, mcpClient planners.MCPClient, listOutput, outputDir, localDir string) ([]string, error) {
+func parseAndDownloadImages(ctx context.Context, mcpClient planners.MCPClient, listOutput, outputDir, localDir, conversationID, requestID string) ([]string, error) {
 	var names []string
 	lines := strings.Split(listOutput, "\n")
 	for _, line := range lines {
@@ -711,6 +785,8 @@ func parseAndDownloadImages(ctx context.Context, mcpClient planners.MCPClient, l
 			Arguments: map[string]interface{}{
 				"path": path,
 			},
+			ConversationID: conversationID,
+			RequestID:      requestID,
 		})
 		if err != nil {
 			continue
