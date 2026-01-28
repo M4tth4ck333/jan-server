@@ -3,7 +3,7 @@ module jan-server/cmd/jan-cli
 go 1.24.0
 
 require (
-	github.com/janhq/jan-server/packages/go-common v0.0.0-20260125110725-a313ebd96ab6
+	github.com/janhq/jan-server/packages/go-common v0.0.0-20260126083650-d8a3875b9cb0
 	github.com/spf13/cobra v1.8.1
 	gopkg.in/yaml.v3 v3.0.1
 )
