@@ -15,6 +15,7 @@ import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as ArtifactsIndexRouteImport } from './routes/artifacts/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as ConnectorsIndexRouteImport } from './routes/connectors/index'
 import { Route as ThreadsTemporaryRouteImport } from './routes/threads/temporary'
 import { Route as ThreadsConversationIdRouteImport } from './routes/threads/$conversationId'
 import { Route as ShareSlugRouteImport } from './routes/share/$slug'
@@ -24,6 +25,7 @@ import { Route as DocsQuickstartRouteImport } from './routes/docs/quickstart'
 import { Route as DashboardUsageRouteImport } from './routes/dashboard/usage'
 import { Route as DashboardApiKeysRouteImport } from './routes/dashboard/api-keys'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as ConnectorsCallbackRouteImport } from './routes/connectors/callback'
 import { Route as AdminPromptTemplatesRouteImport } from './routes/admin/prompt-templates'
 import { Route as AdminMcpToolsRouteImport } from './routes/admin/mcp-tools'
 import { Route as DocsGuidesIndexRouteImport } from './routes/docs/guides/index'
@@ -83,6 +85,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConnectorsIndexRoute = ConnectorsIndexRouteImport.update({
+  id: '/connectors/',
+  path: '/connectors/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ThreadsTemporaryRoute = ThreadsTemporaryRouteImport.update({
   id: '/threads/temporary',
   path: '/threads/temporary',
@@ -126,6 +133,11 @@ const DashboardApiKeysRoute = DashboardApiKeysRouteImport.update({
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnectorsCallbackRoute = ConnectorsCallbackRouteImport.update({
+  id: '/connectors/callback',
+  path: '/connectors/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminPromptTemplatesRoute = AdminPromptTemplatesRouteImport.update({
@@ -280,6 +292,8 @@ export interface FileRoutesByFullPath {
   '/admin/mcp-tools': typeof AdminMcpToolsRoute
   '/admin/prompt-templates': typeof AdminPromptTemplatesRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/connectors/callback': typeof ConnectorsCallbackRoute
+  '/connectors/': typeof ConnectorsIndexRoute
   '/dashboard/api-keys': typeof DashboardApiKeysRoute
   '/dashboard/usage': typeof DashboardUsageRoute
   '/docs/quickstart': typeof DocsQuickstartRoute
@@ -325,6 +339,8 @@ export interface FileRoutesByTo {
   '/admin/mcp-tools': typeof AdminMcpToolsRoute
   '/admin/prompt-templates': typeof AdminPromptTemplatesRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/connectors/callback': typeof ConnectorsCallbackRoute
+  '/connectors': typeof ConnectorsIndexRoute
   '/dashboard/api-keys': typeof DashboardApiKeysRoute
   '/dashboard/usage': typeof DashboardUsageRoute
   '/docs/quickstart': typeof DocsQuickstartRoute
@@ -371,6 +387,8 @@ export interface FileRoutesById {
   '/admin/mcp-tools': typeof AdminMcpToolsRoute
   '/admin/prompt-templates': typeof AdminPromptTemplatesRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/connectors/callback': typeof ConnectorsCallbackRoute
+  '/connectors/': typeof ConnectorsIndexRoute
   '/dashboard/api-keys': typeof DashboardApiKeysRoute
   '/dashboard/usage': typeof DashboardUsageRoute
   '/docs/quickstart': typeof DocsQuickstartRoute
@@ -418,6 +436,8 @@ export interface FileRouteTypes {
     | '/admin/mcp-tools'
     | '/admin/prompt-templates'
     | '/auth/callback'
+    | '/connectors/callback'
+    | '/connectors/'
     | '/dashboard/api-keys'
     | '/dashboard/usage'
     | '/docs/quickstart'
@@ -463,6 +483,8 @@ export interface FileRouteTypes {
     | '/admin/mcp-tools'
     | '/admin/prompt-templates'
     | '/auth/callback'
+    | '/connectors/callback'
+    | '/connectors'
     | '/dashboard/api-keys'
     | '/dashboard/usage'
     | '/docs/quickstart'
@@ -508,6 +530,8 @@ export interface FileRouteTypes {
     | '/admin/mcp-tools'
     | '/admin/prompt-templates'
     | '/auth/callback'
+    | '/connectors/callback'
+    | '/connectors/'
     | '/dashboard/api-keys'
     | '/dashboard/usage'
     | '/docs/quickstart'
@@ -554,6 +578,7 @@ export interface RootRouteChildren {
   AdminMcpToolsRoute: typeof AdminMcpToolsRoute
   AdminPromptTemplatesRoute: typeof AdminPromptTemplatesRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  ConnectorsCallbackRoute: typeof ConnectorsCallbackRoute
   DashboardApiKeysRoute: typeof DashboardApiKeysRoute
   DashboardUsageRoute: typeof DashboardUsageRoute
   DocsQuickstartRoute: typeof DocsQuickstartRoute
@@ -563,6 +588,7 @@ export interface RootRouteChildren {
   ThreadsConversationIdRoute: typeof ThreadsConversationIdRoute
   ThreadsTemporaryRoute: typeof ThreadsTemporaryRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  ConnectorsIndexRoute: typeof ConnectorsIndexRoute
   ArtifactsIndexRoute: typeof ArtifactsIndexRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DocsIndexRoute: typeof DocsIndexRoute
@@ -700,6 +726,20 @@ declare module '@tanstack/react-router' {
       path: '/auth/callback'
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connectors/': {
+      id: '/connectors/'
+      path: '/connectors'
+      fullPath: '/connectors/'
+      preLoaderRoute: typeof ConnectorsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connectors/callback': {
+      id: '/connectors/callback'
+      path: '/connectors/callback'
+      fullPath: '/connectors/callback'
+      preLoaderRoute: typeof ConnectorsCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/prompt-templates': {
@@ -906,6 +946,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminMcpToolsRoute: AdminMcpToolsRoute,
   AdminPromptTemplatesRoute: AdminPromptTemplatesRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  ConnectorsCallbackRoute: ConnectorsCallbackRoute,
   DashboardApiKeysRoute: DashboardApiKeysRoute,
   DashboardUsageRoute: DashboardUsageRoute,
   DocsQuickstartRoute: DocsQuickstartRoute,
@@ -915,6 +956,7 @@ const rootRouteChildren: RootRouteChildren = {
   ThreadsConversationIdRoute: ThreadsConversationIdRoute,
   ThreadsTemporaryRoute: ThreadsTemporaryRoute,
   AdminIndexRoute: AdminIndexRoute,
+  ConnectorsIndexRoute: ConnectorsIndexRoute,
   ArtifactsIndexRoute: ArtifactsIndexRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DocsIndexRoute: DocsIndexRoute,
