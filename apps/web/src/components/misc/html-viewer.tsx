@@ -1,12 +1,11 @@
-// Markdown viewer - full screen, rendered via portal
+// HTML viewer - full screen, rendered via portal with iframe
 import { createPortal } from "react-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { XIcon, DownloadIcon, ExternalLinkIcon, Loader2 } from "lucide-react";
 import { Button } from "@janhq/interfaces/button";
-import { MessageResponse } from "@janhq/interfaces/ai-elements/message";
 
-export const MdViewer = ({
+export const HtmlViewer = ({
   content,
   title,
   onDownload,
@@ -29,6 +28,7 @@ export const MdViewer = ({
       navigate({ to: "/threads/$conversationId", params: { conversationId } });
     }
   };
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -46,6 +46,24 @@ export const MdViewer = ({
     }
   };
 
+  // Create and manage blob URL for the HTML content
+  const [htmlBlobUrl, setHtmlBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!content) {
+      setHtmlBlobUrl(null);
+      return;
+    }
+    // Create new blob URL
+    const url = URL.createObjectURL(new Blob([content], { type: "text/html" }));
+    setHtmlBlobUrl(url);
+
+    // Cleanup on content change or unmount
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [content]);
+
   // Render via portal to escape any parent constraints
   return createPortal(
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -53,11 +71,11 @@ export const MdViewer = ({
       <div className="absolute inset-0" onClick={onClose} />
 
       {/* Modal container */}
-      <div className="relative w-[90%] max-w-4xl h-[80%] bg-background rounded-xl border shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-[95%] max-w-6xl h-[90%] bg-background rounded-xl border shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
           <div>
-            <h2 className="font-medium">{title || "Research Report"}</h2>
+            <h2 className="font-medium">{title || "HTML Preview"}</h2>
           </div>
           <div className="flex items-center gap-2">
             {conversationId && (
@@ -79,16 +97,21 @@ export const MdViewer = ({
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-hidden bg-white">
           {isLoading ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center h-full bg-background">
               <Loader2 className="size-8 animate-spin text-muted-foreground" />
             </div>
+          ) : htmlBlobUrl ? (
+            <iframe
+              src={htmlBlobUrl}
+              title={title || "HTML Preview"}
+              className="w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin"
+            />
           ) : (
-            <div className="max-w-3xl mx-auto p-6">
-              <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                <MessageResponse>{content}</MessageResponse>
-              </div>
+            <div className="flex items-center justify-center h-full bg-background">
+              <p className="text-muted-foreground">No content to display</p>
             </div>
           )}
         </div>

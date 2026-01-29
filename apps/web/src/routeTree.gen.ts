@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProfileIndexRouteImport } from './routes/profile/index'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as ArtifactsIndexRouteImport } from './routes/artifacts/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ThreadsTemporaryRouteImport } from './routes/threads/temporary'
 import { Route as ThreadsConversationIdRouteImport } from './routes/threads/$conversationId'
@@ -70,6 +71,11 @@ const DocsIndexRoute = DocsIndexRouteImport.update({
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
   id: '/dashboard/',
   path: '/dashboard/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArtifactsIndexRoute = ArtifactsIndexRouteImport.update({
+  id: '/artifacts/',
+  path: '/artifacts/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -283,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/threads/$conversationId': typeof ThreadsConversationIdRoute
   '/threads/temporary': typeof ThreadsTemporaryRoute
   '/admin/': typeof AdminIndexRoute
+  '/artifacts/': typeof ArtifactsIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/profile/': typeof ProfileIndexRoute
@@ -327,6 +334,7 @@ export interface FileRoutesByTo {
   '/threads/$conversationId': typeof ThreadsConversationIdRoute
   '/threads/temporary': typeof ThreadsTemporaryRoute
   '/admin': typeof AdminIndexRoute
+  '/artifacts': typeof ArtifactsIndexRoute
   '/dashboard': typeof DashboardIndexRoute
   '/docs': typeof DocsIndexRoute
   '/profile': typeof ProfileIndexRoute
@@ -372,6 +380,7 @@ export interface FileRoutesById {
   '/threads/$conversationId': typeof ThreadsConversationIdRoute
   '/threads/temporary': typeof ThreadsTemporaryRoute
   '/admin/': typeof AdminIndexRoute
+  '/artifacts/': typeof ArtifactsIndexRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/profile/': typeof ProfileIndexRoute
@@ -418,6 +427,7 @@ export interface FileRouteTypes {
     | '/threads/$conversationId'
     | '/threads/temporary'
     | '/admin/'
+    | '/artifacts/'
     | '/dashboard/'
     | '/docs/'
     | '/profile/'
@@ -462,6 +472,7 @@ export interface FileRouteTypes {
     | '/threads/$conversationId'
     | '/threads/temporary'
     | '/admin'
+    | '/artifacts'
     | '/dashboard'
     | '/docs'
     | '/profile'
@@ -506,6 +517,7 @@ export interface FileRouteTypes {
     | '/threads/$conversationId'
     | '/threads/temporary'
     | '/admin/'
+    | '/artifacts/'
     | '/dashboard/'
     | '/docs/'
     | '/profile/'
@@ -551,6 +563,7 @@ export interface RootRouteChildren {
   ThreadsConversationIdRoute: typeof ThreadsConversationIdRoute
   ThreadsTemporaryRoute: typeof ThreadsTemporaryRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  ArtifactsIndexRoute: typeof ArtifactsIndexRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DocsIndexRoute: typeof DocsIndexRoute
   ProfileIndexRoute: typeof ProfileIndexRoute
@@ -610,6 +623,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard/'
       preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/artifacts/': {
+      id: '/artifacts/'
+      path: '/artifacts'
+      fullPath: '/artifacts/'
+      preLoaderRoute: typeof ArtifactsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -895,6 +915,7 @@ const rootRouteChildren: RootRouteChildren = {
   ThreadsConversationIdRoute: ThreadsConversationIdRoute,
   ThreadsTemporaryRoute: ThreadsTemporaryRoute,
   AdminIndexRoute: AdminIndexRoute,
+  ArtifactsIndexRoute: ArtifactsIndexRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DocsIndexRoute: DocsIndexRoute,
   ProfileIndexRoute: ProfileIndexRoute,
